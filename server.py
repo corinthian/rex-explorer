@@ -4,7 +4,9 @@ import json
 import mimetypes
 import os
 import sys
+import urllib.error
 import urllib.parse
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -34,6 +36,7 @@ def _load_api_key() -> str:
 
 
 _client: LastFM | None = None
+_image_cache: dict = {}  # artist name -> image URL or None
 
 
 def get_client() -> LastFM:
@@ -41,6 +44,41 @@ def get_client() -> LastFM:
     if _client is None:
         _client = LastFM(_load_api_key())
     return _client
+
+
+def _fetch_image_url(name: str) -> str | None:
+    """Try Wikipedia thumbnail, fall back to iTunes album art."""
+    # 1. Wikipedia REST API
+    try:
+        slug = urllib.parse.quote(name.replace(" ", "_"))
+        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{slug}"
+        req = urllib.request.Request(url, headers={"User-Agent": "rex-musicrec/1.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+        thumb = data.get("thumbnail", {}).get("source")
+        if thumb:
+            # Prefer larger version if available
+            original = data.get("originalimage", {}).get("source")
+            return original or thumb
+    except Exception:
+        pass
+
+    # 2. iTunes album art fallback
+    try:
+        query = urllib.parse.urlencode({"term": name, "entity": "album", "limit": 1})
+        url = f"https://itunes.apple.com/search?{query}"
+        req = urllib.request.Request(url, headers={"User-Agent": "rex-musicrec/1.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+        results = data.get("results", [])
+        if results:
+            art = results[0].get("artworkUrl100", "")
+            if art:
+                return art.replace("100x100bb", "300x300bb")
+    except Exception:
+        pass
+
+    return None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -70,6 +108,8 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_artist(params)
         elif path == "/api/similar":
             self._handle_similar(params)
+        elif path == "/api/image":
+            self._handle_image(params)
         else:
             self._serve_static(path)
 
@@ -103,6 +143,17 @@ class Handler(BaseHTTPRequestHandler):
             self._json(results)
         except LastFMError as e:
             self._error(str(e))
+
+    def _handle_image(self, params):
+        name = params.get("name", "").strip()
+        if not name:
+            return self._error("missing name", 400)
+        if name in _image_cache:
+            return self._json({"url": _image_cache[name]})
+
+        url = _fetch_image_url(name)
+        _image_cache[name] = url
+        self._json({"url": url})
 
     def _serve_static(self, path):
         if path == "/" or path == "":

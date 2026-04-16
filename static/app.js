@@ -23,11 +23,43 @@ function fmtListeners(n) {
   return `${n} listeners`;
 }
 
+// ------------------------------------------------------------------ image cache
+// Values: HTMLImageElement (loaded), 'loading', null (failed/none)
+
+const imageCache = new Map();
+
+function getImage(name) {
+  return imageCache.get(name) ?? null;
+}
+
+function loadImage(name) {
+  if (imageCache.has(name)) return;
+  imageCache.set(name, 'loading');
+  fetch(`/api/image?name=${encodeURIComponent(name)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.url) { imageCache.set(name, null); return; }
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        imageCache.set(name, img);
+        Graph.refresh();
+      };
+      img.onerror = () => imageCache.set(name, null);
+      img.src = data.url;
+    })
+    .catch(() => imageCache.set(name, null));
+}
+
 // ------------------------------------------------------------------ state
 
 const nodes = new Map();   // name -> node object
 const links = [];          // {source, target, match}
 const detailCache = new Map(); // name -> artist info
+
+// ------------------------------------------------------------------ pointer tracking
+
+let pointerGraphCoords = null;
 
 // ------------------------------------------------------------------ graph
 
@@ -38,29 +70,53 @@ const Graph = ForceGraph()(graphEl)
   .nodeId("id")
   .nodeCanvasObject((node, ctx, globalScale) => {
     const r = node.expanded ? 22 : 18;
-    // circle
+    const img = getImage(node.name);
+
+    ctx.save();
     ctx.beginPath();
     ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
-    ctx.fillStyle = node.color;
-    ctx.fill();
+
+    if (img && img !== 'loading') {
+      // clip to circle, draw portrait
+      ctx.clip();
+      ctx.drawImage(img, node.x - r, node.y - r, r * 2, r * 2);
+      // subtle color tint overlay so the ring color stays visible
+      ctx.globalAlpha = 0.15;
+      ctx.fillStyle = node.color;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    } else {
+      // fallback: solid color + initials
+      ctx.fillStyle = node.color;
+      ctx.fill();
+      const fontSize = Math.max(9, r * 0.65);
+      ctx.font = `600 ${fontSize}px -apple-system, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.fillText(node.initials, node.x, node.y);
+    }
+
+    ctx.restore();
+
     // ring for expanded nodes
     if (node.expanded) {
-      ctx.strokeStyle = "rgba(255,255,255,0.3)";
-      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
+      ctx.strokeStyle = "rgba(255,255,255,0.45)";
+      ctx.lineWidth = 2;
       ctx.stroke();
     }
-    // initials
-    const fontSize = Math.max(9, r * 0.65);
-    ctx.font = `600 ${fontSize}px -apple-system, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.fillText(node.initials, node.x, node.y);
+
     // label below
     const labelSize = Math.max(8, 11 / globalScale);
     ctx.font = `${labelSize}px -apple-system, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
     ctx.fillStyle = "rgba(220,220,220,0.85)";
-    ctx.fillText(node.name, node.x, node.y + r + labelSize * 0.9);
+    ctx.fillText(node.name, node.x, node.y + r + 3);
   })
   .nodePointerAreaPaint((node, color, ctx) => {
     const r = 24;
@@ -77,7 +133,55 @@ const Graph = ForceGraph()(graphEl)
   .warmupTicks(20)
   .cooldownTime(3000);
 
-// Responsive resize
+// ------------------------------------------------------------------ pointer repulsion force
+
+Graph.d3Force('pointer-repulsion', alpha => {
+  if (!pointerGraphCoords) return;
+  const RADIUS = 120;   // graph-space pixels
+  const STRENGTH = 2.5;
+  const { x: px, y: py } = pointerGraphCoords;
+
+  for (const node of nodes.values()) {
+    if (node.x == null || node.y == null) continue;
+    const dx = node.x - px;
+    const dy = node.y - py;
+    const dist2 = dx * dx + dy * dy;
+    if (dist2 < RADIUS * RADIUS && dist2 > 0.01) {
+      const dist = Math.sqrt(dist2);
+      const force = STRENGTH * alpha * (1 - dist / RADIUS);
+      node.vx = (node.vx || 0) + (dx / dist) * force;
+      node.vy = (node.vy || 0) + (dy / dist) * force;
+    }
+  }
+});
+
+// Track pointer and reheat simulation when near nodes
+graphEl.addEventListener('mousemove', e => {
+  const rect = graphEl.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  pointerGraphCoords = Graph.screen2GraphCoords(sx, sy);
+
+  // Reheat if pointer is close to any node so the force stays active
+  const TRIGGER_RADIUS = 120;
+  const { x: px, y: py } = pointerGraphCoords;
+  for (const node of nodes.values()) {
+    if (node.x == null || node.y == null) continue;
+    const dx = node.x - px;
+    const dy = node.y - py;
+    if (dx * dx + dy * dy < TRIGGER_RADIUS * TRIGGER_RADIUS) {
+      Graph.d3ReheatSimulation();
+      break;
+    }
+  }
+});
+
+graphEl.addEventListener('mouseleave', () => {
+  pointerGraphCoords = null;
+});
+
+// ------------------------------------------------------------------ responsive resize
+
 const ro = new ResizeObserver(() => {
   Graph.width(graphEl.offsetWidth).height(graphEl.offsetHeight);
 });
@@ -90,6 +194,7 @@ function addNode(name, color, inits, tags = []) {
   if (nodes.has(name)) return nodes.get(name);
   const node = { id: name, name, color, initials: inits, tags, expanded: false };
   nodes.set(name, node);
+  loadImage(name);   // kick off portrait fetch immediately
   return node;
 }
 
@@ -184,8 +289,7 @@ async function handleNodeClick(node) {
     const similar = await res.json();
     if (res.ok && Array.isArray(similar)) {
       for (const s of similar) {
-        const c = hashColor(s.name);
-        const n = addNode(s.name, c, initials(s.name));
+        addNode(s.name, hashColor(s.name), initials(s.name));
         addLink(node.name, s.name, s.match);
       }
       refreshGraph();
@@ -199,7 +303,6 @@ async function handleNodeClick(node) {
 }
 
 function collapseNode(node) {
-  // find children of this node that have no other parents and aren't expanded
   const childNames = links
     .filter(l => {
       const a = l.source?.id ?? l.source;
@@ -216,7 +319,6 @@ function collapseNode(node) {
   for (const childName of childNames) {
     const childNode = nodes.get(childName);
     if (!childNode || childNode.expanded) continue;
-    // count parents (links connecting to this child, excluding the parent being collapsed)
     const parentCount = links.filter(l => {
       const a = l.source?.id ?? l.source;
       const b = l.target?.id ?? l.target;
@@ -229,8 +331,8 @@ function collapseNode(node) {
   for (const name of toRemove) {
     nodes.delete(name);
     detailCache.delete(name);
+    imageCache.delete(name);
   }
-  // remove links involving removed nodes
   const removeLinks = links.filter(l => {
     const a = l.source?.id ?? l.source;
     const b = l.target?.id ?? l.target;
@@ -329,7 +431,6 @@ async function addRootArtist(name) {
     showDetail(canonName);
 
     refreshGraph();
-    // center on root after brief settle
     setTimeout(() => {
       Graph.centerAt(rootNode.x ?? 0, rootNode.y ?? 0, 800);
       Graph.zoom(2.5, 800);
