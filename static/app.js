@@ -56,6 +56,7 @@ function loadImage(name) {
 const nodes = new Map();   // name -> node object
 const links = [];          // {source, target, match}
 const detailCache = new Map(); // name -> artist info
+let rootNodeName = null;   // name of the first/current root artist
 
 // ------------------------------------------------------------------ pointer tracking
 
@@ -440,6 +441,27 @@ function escHtml(s) {
           .replace(/"/g, "&quot;");
 }
 
+// ------------------------------------------------------------------ zoom controls
+
+const ZOOM_STEP = 1.5;
+const ZOOM_DURATION = 300;
+
+document.getElementById("btn-zoom-in").addEventListener("click", () => {
+  Graph.zoom(Graph.zoom() * ZOOM_STEP, ZOOM_DURATION);
+});
+
+document.getElementById("btn-zoom-out").addEventListener("click", () => {
+  Graph.zoom(Graph.zoom() / ZOOM_STEP, ZOOM_DURATION);
+});
+
+document.getElementById("btn-center").addEventListener("click", () => {
+  if (!rootNodeName) return;
+  const root = nodes.get(rootNodeName);
+  if (!root || root.x == null) return;
+  Graph.centerAt(root.x, root.y, 600);
+  Graph.zoom(2.5, 600);
+});
+
 // ------------------------------------------------------------------ root artist
 
 async function addRootArtist(name) {
@@ -465,6 +487,7 @@ async function addRootArtist(name) {
 
     if (!info.error) detailCache.set(canonName, info);
     showDetail(canonName);
+    rootNodeName = canonName;
 
     refreshGraph();
     setTimeout(() => {
