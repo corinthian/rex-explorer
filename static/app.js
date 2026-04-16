@@ -478,6 +478,32 @@ function escHtml(s) {
           .replace(/"/g, "&quot;");
 }
 
+// ------------------------------------------------------------------ floating tooltip
+// Used for buttons inside overflow:hidden containers where CSS ::after is clipped.
+
+const floatingTip = document.createElement('div');
+Object.assign(floatingTip.style, {
+  position: 'fixed', background: '#e8e8e8', color: '#111',
+  fontSize: '13px', fontWeight: '500', fontFamily: 'inherit',
+  padding: '5px 10px', borderRadius: '5px',
+  pointerEvents: 'none', display: 'none', zIndex: '9999', whiteSpace: 'nowrap',
+});
+document.body.appendChild(floatingTip);
+
+function attachFloatingTooltip(el, text) {
+  el.addEventListener('mouseenter', () => {
+    floatingTip.textContent = text;
+    floatingTip.style.display = 'block';
+    const r = el.getBoundingClientRect();
+    const t = floatingTip.getBoundingClientRect();
+    floatingTip.style.left = `${r.left - t.width - 8}px`;
+    floatingTip.style.top  = `${r.top + (r.height - t.height) / 2}px`;
+  });
+  el.addEventListener('mouseleave', () => { floatingTip.style.display = 'none'; });
+}
+
+attachFloatingTooltip(document.getElementById('detail-center'), 'Center on artist');
+
 // ------------------------------------------------------------------ zoom controls
 
 const ZOOM_STEP = 1.5;
