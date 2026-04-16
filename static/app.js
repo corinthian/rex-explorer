@@ -284,6 +284,15 @@ document.getElementById("detail-close").addEventListener("click", () => {
   detailPanel.hidden = true;
 });
 
+document.getElementById("detail-center").addEventListener("click", () => {
+  const name = detailName.textContent;
+  if (!name) return;
+  const node = nodes.get(name);
+  if (!node || node.x == null) return;
+  Graph.centerAt(node.x, node.y, 600);
+  Graph.zoom(2.5, 600);
+});
+
 async function showDetail(name) {
   detailPanel.hidden = false;
   detailName.textContent = name;
