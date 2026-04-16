@@ -128,10 +128,14 @@ const Graph = ForceGraph()(graphEl)
   .linkWidth(link => Math.max(0.5, (link.match || 0) * 3))
   .linkColor(() => "rgba(255,255,255,0.12)")
   .onNodeClick(handleNodeClick)
-  .d3AlphaDecay(0.04)
+  .d3AlphaDecay(0.03)
   .d3VelocityDecay(0.25)
-  .warmupTicks(20)
-  .cooldownTime(3000);
+  .warmupTicks(30)
+  .cooldownTime(4000);
+
+// Stronger node separation — default charge (-30) and link distance are too tight
+Graph.d3Force('charge').strength(-350);
+Graph.d3Force('link').distance(120);
 
 // ------------------------------------------------------------------ pointer repulsion force
 

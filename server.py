@@ -46,22 +46,35 @@ def get_client() -> LastFM:
     return _client
 
 
-def _fetch_image_url(name: str) -> str | None:
-    """Try Wikipedia thumbnail, fall back to iTunes album art."""
-    # 1. Wikipedia REST API
+def _wikipedia_thumbnail(slug: str) -> str | None:
+    """Fetch Wikipedia page summary and return image URL, or None."""
     try:
-        slug = urllib.parse.quote(name.replace(" ", "_"))
-        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{slug}"
+        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(slug)}"
         req = urllib.request.Request(url, headers={"User-Agent": "rex-musicrec/1.0"})
         with urllib.request.urlopen(req, timeout=8) as resp:
+            if resp.status != 200:
+                return None
             data = json.loads(resp.read().decode())
+        # Skip disambiguation pages — they have no useful image
+        if data.get("type") == "disambiguation":
+            return None
         thumb = data.get("thumbnail", {}).get("source")
-        if thumb:
-            # Prefer larger version if available
-            original = data.get("originalimage", {}).get("source")
-            return original or thumb
+        if not thumb:
+            return None
+        original = data.get("originalimage", {}).get("source")
+        return original or thumb
     except Exception:
-        pass
+        return None
+
+
+def _fetch_image_url(name: str) -> str | None:
+    """Try Wikipedia (with band/musician fallbacks), then iTunes album art."""
+    # 1. Wikipedia — try plain name, then _(band), then _(musician)
+    slug_base = name.replace(" ", "_")
+    for slug in (slug_base, f"{slug_base}_(band)", f"{slug_base}_(musician)"):
+        url = _wikipedia_thumbnail(slug)
+        if url:
+            return url
 
     # 2. iTunes album art fallback
     try:
