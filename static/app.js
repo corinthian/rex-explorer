@@ -60,6 +60,22 @@ const detailCache = new Map(); // name -> artist info
 // ------------------------------------------------------------------ pointer tracking
 
 let pointerGraphCoords = null;
+let pinnedNode = null;  // node currently frozen under the pointer
+
+function pinNode(node) {
+  if (pinnedNode === node) return;
+  unpinCurrent();
+  node.fx = node.x;
+  node.fy = node.y;
+  pinnedNode = node;
+}
+
+function unpinCurrent() {
+  if (!pinnedNode) return;
+  pinnedNode.fx = null;
+  pinnedNode.fy = null;
+  pinnedNode = null;
+}
 
 // ------------------------------------------------------------------ graph
 
@@ -141,11 +157,12 @@ Graph.d3Force('link').distance(120);
 
 Graph.d3Force('pointer-repulsion', alpha => {
   if (!pointerGraphCoords) return;
-  const RADIUS = 120;   // graph-space pixels
-  const STRENGTH = 2.5;
+  const RADIUS = 55;
+  const STRENGTH = 0.7;
   const { x: px, y: py } = pointerGraphCoords;
 
   for (const node of nodes.values()) {
+    if (node === pinnedNode) continue;  // pinned node stays put
     if (node.x == null || node.y == null) continue;
     const dx = node.x - px;
     const dy = node.y - py;
@@ -159,28 +176,42 @@ Graph.d3Force('pointer-repulsion', alpha => {
   }
 });
 
-// Track pointer and reheat simulation when near nodes
+const HIT_RADIUS = 24;  // match nodePointerAreaPaint radius
+
 graphEl.addEventListener('mousemove', e => {
   const rect = graphEl.getBoundingClientRect();
-  const sx = e.clientX - rect.left;
-  const sy = e.clientY - rect.top;
-  pointerGraphCoords = Graph.screen2GraphCoords(sx, sy);
-
-  // Reheat if pointer is close to any node so the force stays active
-  const TRIGGER_RADIUS = 120;
+  pointerGraphCoords = Graph.screen2GraphCoords(e.clientX - rect.left, e.clientY - rect.top);
   const { x: px, y: py } = pointerGraphCoords;
+
+  // Find node directly under pointer and pin it; unpin when pointer moves off
+  let hit = null;
   for (const node of nodes.values()) {
     if (node.x == null || node.y == null) continue;
     const dx = node.x - px;
     const dy = node.y - py;
-    if (dx * dx + dy * dy < TRIGGER_RADIUS * TRIGGER_RADIUS) {
-      Graph.d3ReheatSimulation();
-      break;
+    if (dx * dx + dy * dy < HIT_RADIUS * HIT_RADIUS) { hit = node; break; }
+  }
+
+  if (hit) {
+    pinNode(hit);
+  } else {
+    unpinCurrent();
+    // Reheat for repulsion only when not hovering a node
+    const TRIGGER_RADIUS = 55;
+    for (const node of nodes.values()) {
+      if (node.x == null || node.y == null) continue;
+      const dx = node.x - px;
+      const dy = node.y - py;
+      if (dx * dx + dy * dy < TRIGGER_RADIUS * TRIGGER_RADIUS) {
+        Graph.d3ReheatSimulation();
+        break;
+      }
     }
   }
 });
 
 graphEl.addEventListener('mouseleave', () => {
+  unpinCurrent();
   pointerGraphCoords = null;
 });
 
@@ -333,6 +364,7 @@ function collapseNode(node) {
   }
 
   for (const name of toRemove) {
+    if (pinnedNode && pinnedNode.name === name) unpinCurrent();
     nodes.delete(name);
     detailCache.delete(name);
     imageCache.delete(name);
