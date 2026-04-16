@@ -144,6 +144,28 @@ body {
 #controls button:hover  { background: #262626; color: #fff; }
 #controls button:active { background: #333; }
 
+#controls button[data-tooltip] { position: relative; }
+
+#controls button[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  right: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #e8e8e8;
+  color: #111;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 5px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+#controls button[data-tooltip]:hover::after { opacity: 1; }
+
 /* Loading indicator */
 #loading {
   position: absolute;
