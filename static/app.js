@@ -329,7 +329,7 @@ async function showDetail(name) {
 
   detailName.textContent = info.name || name;
   detailListeners.textContent = info.listeners ? fmtListeners(info.listeners) : "";
-  detailTags.innerHTML = (info.tags || []).slice(0, 5)
+  detailTags.innerHTML = (info.tags || []).slice(0, 6)
     .map(t => `<span class="tag">${escHtml(t)}</span>`).join("");
   detailBio.textContent = info.bio_summary || "";
   detailLink.href = info.url || "#";
