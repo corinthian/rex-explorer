@@ -126,8 +126,14 @@ body {
   position: absolute;
   bottom: 12px;
   left: 16px;
-  right: 40px;
+  right: 16px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
 }
+
+#detail-hero-text-left { flex: 1; min-width: 0; }
 
 #detail-name {
   font-size: 20px;
@@ -135,6 +141,9 @@ body {
   color: #fff;
   line-height: 1.2;
   text-shadow: 0 1px 6px rgba(0,0,0,0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #detail-listeners {
@@ -148,9 +157,6 @@ body {
   padding: 11px 16px 13px;
   border-bottom: 1px solid transparent;
   transition: border-color 0.25s;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
 }
 
 #detail-panel:hover #detail-tags-row {
@@ -158,7 +164,6 @@ body {
 }
 
 #detail-tags {
-  flex: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -166,39 +171,24 @@ body {
 
 #detail-center {
   flex-shrink: 0;
-  width: 30px;
-  height: 30px;
-  background: #252525;
-  border: 1px solid #383838;
+  width: 52px;
+  height: 26px;
+  background: rgba(0,0,0,0.45);
+  border: 1px solid rgba(255,255,255,0.2);
   border-radius: 6px;
-  color: #c8c8c8;
-  font-size: 16px;
+  color: rgba(255,255,255,0.8);
+  font-size: 15px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s;
-  position: relative;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-#detail-center:hover { background: #333; color: #fff; }
-
-#detail-center[data-tooltip]::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: calc(100% + 8px);
-  right: 0;
-  background: #e8e8e8;
-  color: #111;
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  padding: 5px 10px;
-  border-radius: 5px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s;
+#detail-center:hover {
+  background: rgba(255,255,255,0.15);
+  border-color: rgba(255,255,255,0.4);
+  color: #fff;
 }
-#detail-center:hover::after { opacity: 1; }
 
 .tag {
   background: #252525;
