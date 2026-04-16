@@ -273,11 +273,16 @@ function stopLoading() {
 // ------------------------------------------------------------------ detail panel
 
 const detailPanel = document.getElementById("detail-panel");
+const detailImg = document.getElementById("detail-img");
 const detailName = document.getElementById("detail-name");
 const detailListeners = document.getElementById("detail-listeners");
 const detailTags = document.getElementById("detail-tags");
 const detailBio = document.getElementById("detail-bio");
 const detailLink = document.getElementById("detail-link");
+
+document.getElementById("detail-close").addEventListener("click", () => {
+  detailPanel.hidden = true;
+});
 
 async function showDetail(name) {
   detailPanel.hidden = false;
@@ -286,6 +291,29 @@ async function showDetail(name) {
   detailTags.innerHTML = "";
   detailBio.textContent = "";
   detailLink.href = "#";
+  detailImg.hidden = true;
+  detailImg.src = "";
+
+  // Show portrait if already loaded
+  const cachedImg = imageCache.get(name);
+  if (cachedImg && cachedImg !== 'loading') {
+    detailImg.src = cachedImg.src;
+    detailImg.hidden = false;
+  } else if (cachedImg === 'loading' || !imageCache.has(name)) {
+    // Wait for it — re-render when it arrives
+    const checkInterval = setInterval(() => {
+      const img = imageCache.get(name);
+      if (img && img !== 'loading') {
+        clearInterval(checkInterval);
+        if (!detailPanel.hidden && detailName.textContent === name) {
+          detailImg.src = img.src;
+          detailImg.hidden = false;
+        }
+      } else if (img === null) {
+        clearInterval(checkInterval);
+      }
+    }, 200);
+  }
 
   let info = detailCache.get(name);
   if (!info) {
@@ -302,7 +330,7 @@ async function showDetail(name) {
   detailName.textContent = info.name || name;
   detailListeners.textContent = info.listeners ? fmtListeners(info.listeners) : "";
   detailTags.innerHTML = (info.tags || []).slice(0, 5)
-    .map(t => `<span class="tag">${t}</span>`).join("");
+    .map(t => `<span class="tag">${escHtml(t)}</span>`).join("");
   detailBio.textContent = info.bio_summary || "";
   detailLink.href = info.url || "#";
 }

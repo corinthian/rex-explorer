@@ -15,11 +15,20 @@
   <div id="graph"></div>
 
   <div id="detail-panel" hidden>
-    <div id="detail-name"></div>
-    <div id="detail-listeners"></div>
-    <div id="detail-tags"></div>
-    <div id="detail-bio"></div>
-    <a id="detail-link" target="_blank" rel="noopener">View on Last.fm</a>
+    <button id="detail-close" aria-label="Close">×</button>
+    <div id="detail-hero">
+      <img id="detail-img" alt="" hidden>
+      <div id="detail-hero-bg"></div>
+      <div id="detail-hero-text">
+        <div id="detail-name"></div>
+        <div id="detail-listeners"></div>
+      </div>
+    </div>
+    <div id="detail-body">
+      <div id="detail-tags"></div>
+      <div id="detail-bio"></div>
+      <a id="detail-link" target="_blank" rel="noopener">View on Last.fm →</a>
+    </div>
   </div>
 
   <div id="controls">
