@@ -4,14 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rex Explorer</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="search-panel">
-    <input id="search-input" type="text" placeholder="Search for an artist…" autocomplete="off" spellcheck="false">
-    <ul id="search-results" hidden></ul>
+    <div id="search-landing">
+      <div id="search-app-name">Rex Explorer</div>
+    </div>
+    <div id="search-input-wrap">
+      <input id="search-input" type="text" placeholder="Search for an artist…" autocomplete="off" spellcheck="false">
+      <button id="search-clear" aria-label="Clear search">×</button>
+      <ul id="search-results" hidden></ul>
+    </div>
+    <div id="search-tagline">Explore the world around any artist</div>
+    <div id="search-error" hidden>No results for that artist — try another name</div>
   </div>
 
+  <div id="bg-graph"></div>
   <div id="graph"></div>
 
   <div id="detail-panel" hidden>

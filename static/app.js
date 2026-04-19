@@ -82,7 +82,7 @@ function unpinCurrent() {
 const graphEl = document.getElementById("graph");
 
 const Graph = ForceGraph()(graphEl)
-  .backgroundColor("#0d0d0d")
+  .backgroundColor("rgba(0,0,0,0)")
   .nodeId("id")
   .nodeCanvasObject((node, ctx, globalScale) => {
     const r = node.expanded ? 22 : 18;
@@ -255,6 +255,93 @@ function reheat() {
   Graph.d3ReheatSimulation();
 }
 
+// ------------------------------------------------------------------ background graph (landing animation)
+
+const bgEl = document.getElementById("bg-graph");
+const bgNodes = new Map();
+const bgLinks = [];
+
+const BgGraph = ForceGraph()(bgEl)
+  .backgroundColor("rgba(0,0,0,0)")
+  .nodeId("id")
+  .nodeCanvasObject((node, ctx) => {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, node.isRoot ? 5 : 3, 0, 2 * Math.PI);
+    ctx.fillStyle = node.isRoot
+      ? "rgba(224,90,84,0.35)"
+      : "rgba(200,200,200,0.15)";
+    ctx.fill();
+    ctx.restore();
+  })
+  .linkColor(() => "rgba(255,255,255,0.06)")
+  .linkWidth(0.8)
+  .nodeLabel("")
+  .d3AlphaMin(0)        // never stop due to alpha threshold
+  .d3AlphaDecay(0.008)  // settle quickly so high-energy phase is brief
+  .d3VelocityDecay(0.3)
+  .warmupTicks(200)
+  .cooldownTicks(Infinity);
+
+BgGraph.d3Force("charge").strength(-180);
+BgGraph.d3Force("link").distance(90);
+
+// Gentle vortex: nodes orbit slowly around graph origin — unscaled by alpha
+// so it persists indefinitely after the simulation settles
+BgGraph.d3Force("drift", () => {
+  const SPEED = 0.000008;
+  for (const node of bgNodes.values()) {
+    if (node.x == null) continue;
+    node.vx = (node.vx || 0) - node.y * SPEED;
+    node.vy = (node.vy || 0) + node.x * SPEED;
+  }
+});
+
+const bgRo = new ResizeObserver(() => {
+  BgGraph.width(bgEl.offsetWidth).height(bgEl.offsetHeight);
+});
+bgRo.observe(bgEl);
+BgGraph.width(bgEl.offsetWidth).height(bgEl.offsetHeight);
+
+async function loadBgGraph() {
+  const ROOT = "Antonín Dvořák";
+  try {
+    bgNodes.set(ROOT, { id: ROOT, isRoot: true });
+
+    const rootSim = await fetch(`/api/similar?artist=${encodeURIComponent(ROOT)}&limit=5`).then(r => r.json());
+    if (!Array.isArray(rootSim)) return;
+
+    for (const s of rootSim) {
+      if (!bgNodes.has(s.name)) bgNodes.set(s.name, { id: s.name, isRoot: false });
+      bgLinks.push({ source: ROOT, target: s.name });
+    }
+
+    // 5 expansions — one per child of Dvořák, in parallel
+    const childResults = await Promise.all(
+      rootSim.map(s =>
+        fetch(`/api/similar?artist=${encodeURIComponent(s.name)}&limit=5`).then(r => r.json())
+      )
+    );
+
+    for (let i = 0; i < rootSim.length; i++) {
+      const parent = rootSim[i].name;
+      const children = childResults[i];
+      if (!Array.isArray(children)) continue;
+      for (const cs of children) {
+        if (!bgNodes.has(cs.name)) bgNodes.set(cs.name, { id: cs.name, isRoot: false });
+        bgLinks.push({ source: parent, target: cs.name });
+      }
+    }
+
+    BgGraph.graphData({ nodes: [...bgNodes.values()], links: bgLinks });
+    setTimeout(() => BgGraph.zoomToFit(500, 60), 900);
+  } catch (e) {
+    // background decoration — ignore failures silently
+  }
+}
+
+loadBgGraph();
+
 // ------------------------------------------------------------------ loading
 
 const loadingEl = document.getElementById("loading");
@@ -423,13 +510,25 @@ function collapseNode(node) {
 
 const searchInput = document.getElementById("search-input");
 const searchResults = document.getElementById("search-results");
+const searchClear = document.getElementById("search-clear");
+const searchError = document.getElementById("search-error");
 let searchTimer = null;
 
 searchInput.addEventListener("input", () => {
+  searchClear.classList.toggle("visible", searchInput.value.length > 0);
+  searchError.hidden = true;
   clearTimeout(searchTimer);
   const q = searchInput.value.trim();
   if (!q) { searchResults.hidden = true; return; }
   searchTimer = setTimeout(() => doSearch(q), 300);
+});
+
+searchClear.addEventListener("click", () => {
+  searchInput.value = "";
+  searchClear.classList.remove("visible");
+  searchResults.hidden = true;
+  searchError.hidden = true;
+  searchInput.focus();
 });
 
 searchInput.addEventListener("keydown", e => {
@@ -454,7 +553,12 @@ async function doSearch(q) {
 }
 
 function renderSearchResults(results) {
-  if (!results.length) { searchResults.hidden = true; return; }
+  if (!results.length) {
+    searchResults.hidden = true;
+    searchError.hidden = false;
+    return;
+  }
+  searchError.hidden = true;
   searchResults.innerHTML = results.map(r => `
     <li data-name="${escHtml(r.name)}">
       <span class="result-name">${escHtml(r.name)}</span>
@@ -468,6 +572,8 @@ function renderSearchResults(results) {
       const name = li.dataset.name;
       searchInput.value = name;
       searchResults.hidden = true;
+      document.body.classList.add("graph-active");
+      BgGraph.pauseAnimation();
       addRootArtist(name);
     });
   });
@@ -553,6 +659,7 @@ async function addRootArtist(name) {
     rootNodeName = canonName;
 
     refreshGraph();
+    document.getElementById("controls").classList.add("controls-visible");
     setTimeout(() => {
       Graph.centerAt(rootNode.x ?? 0, rootNode.y ?? 0, 800);
       Graph.zoom(2.5, 800);
