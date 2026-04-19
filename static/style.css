@@ -10,9 +10,24 @@ body {
   width: 100dvw;
 }
 
+/* Background graph — landing animation */
+#bg-graph {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 1s ease-in-out;
+}
+
+body.graph-active #bg-graph {
+  opacity: 0;
+}
+
 #graph {
   position: absolute;
   inset: 0;
+  z-index: 2;
 }
 
 /* Search panel — idle: centered landing */
@@ -59,6 +74,7 @@ body.graph-active #search-landing {
   letter-spacing: 0.1em;
   color: #d0d0d0;
   text-transform: uppercase;
+  text-shadow: 0 0 24px #0d0d0d, 0 0 48px #0d0d0d;
 }
 
 /* Input wrapper */
