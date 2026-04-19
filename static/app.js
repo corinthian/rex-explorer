@@ -43,7 +43,6 @@ function loadImage(name) {
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         imageCache.set(name, img);
-        Graph.refresh();
       };
       img.onerror = () => imageCache.set(name, null);
       img.src = data.url;
@@ -144,6 +143,7 @@ const Graph = ForceGraph()(graphEl)
   })
   .linkWidth(link => Math.max(0.5, (link.match || 0) * 3))
   .linkColor(() => "rgba(255,255,255,0.12)")
+  .nodeLabel('')
   .onNodeClick(handleNodeClick)
   .d3AlphaDecay(0.03)
   .d3VelocityDecay(0.25)
