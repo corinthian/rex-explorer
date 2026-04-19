@@ -277,17 +277,19 @@ const BgGraph = ForceGraph()(bgEl)
   .linkColor(() => "rgba(255,255,255,0.06)")
   .linkWidth(0.8)
   .nodeLabel("")
-  .d3AlphaDecay(0.0005)
+  .d3AlphaMin(0)        // never stop due to alpha threshold
+  .d3AlphaDecay(0.008)  // settle quickly so high-energy phase is brief
   .d3VelocityDecay(0.3)
-  .warmupTicks(80)
+  .warmupTicks(200)
   .cooldownTicks(Infinity);
 
 BgGraph.d3Force("charge").strength(-180);
 BgGraph.d3Force("link").distance(90);
 
-// Gentle vortex: all nodes orbit slowly around graph origin
+// Gentle vortex: nodes orbit slowly around graph origin — unscaled by alpha
+// so it persists indefinitely after the simulation settles
 BgGraph.d3Force("drift", () => {
-  const SPEED = 0.00006;
+  const SPEED = 0.000008;
   for (const node of bgNodes.values()) {
     if (node.x == null) continue;
     node.vx = (node.vx || 0) - node.y * SPEED;
