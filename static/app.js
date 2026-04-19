@@ -423,13 +423,25 @@ function collapseNode(node) {
 
 const searchInput = document.getElementById("search-input");
 const searchResults = document.getElementById("search-results");
+const searchClear = document.getElementById("search-clear");
+const searchError = document.getElementById("search-error");
 let searchTimer = null;
 
 searchInput.addEventListener("input", () => {
+  searchClear.classList.toggle("visible", searchInput.value.length > 0);
+  searchError.hidden = true;
   clearTimeout(searchTimer);
   const q = searchInput.value.trim();
   if (!q) { searchResults.hidden = true; return; }
   searchTimer = setTimeout(() => doSearch(q), 300);
+});
+
+searchClear.addEventListener("click", () => {
+  searchInput.value = "";
+  searchClear.classList.remove("visible");
+  searchResults.hidden = true;
+  searchError.hidden = true;
+  searchInput.focus();
 });
 
 searchInput.addEventListener("keydown", e => {
@@ -454,7 +466,12 @@ async function doSearch(q) {
 }
 
 function renderSearchResults(results) {
-  if (!results.length) { searchResults.hidden = true; return; }
+  if (!results.length) {
+    searchResults.hidden = true;
+    searchError.hidden = false;
+    return;
+  }
+  searchError.hidden = true;
   searchResults.innerHTML = results.map(r => `
     <li data-name="${escHtml(r.name)}">
       <span class="result-name">${escHtml(r.name)}</span>
@@ -468,6 +485,7 @@ function renderSearchResults(results) {
       const name = li.dataset.name;
       searchInput.value = name;
       searchResults.hidden = true;
+      document.body.classList.add("graph-active");
       addRootArtist(name);
     });
   });
@@ -553,6 +571,7 @@ async function addRootArtist(name) {
     rootNodeName = canonName;
 
     refreshGraph();
+    document.getElementById("controls").classList.add("controls-visible");
     setTimeout(() => {
       Graph.centerAt(rootNode.x ?? 0, rootNode.y ?? 0, 800);
       Graph.zoom(2.5, 800);
