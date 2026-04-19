@@ -115,7 +115,9 @@ class Handler(BaseHTTPRequestHandler):
         params = dict(urllib.parse.parse_qsl(parsed.query))
         path = parsed.path
 
-        if path == "/api/search":
+        if path == "/favicon.ico":
+            self._serve_favicon()
+        elif path == "/api/search":
             self._handle_search(params)
         elif path == "/api/artist":
             self._handle_artist(params)
@@ -167,6 +169,46 @@ class Handler(BaseHTTPRequestHandler):
         url = _fetch_image_url(name)
         _image_cache[name] = url
         self._json({"url": url})
+
+    def _serve_favicon(self):
+        # Minimal 1x1 transparent ICO — 70 bytes, no dependencies
+        # ICONDIR(6) + ICONDIRENTRY(16) + BITMAPINFOHEADER(40) + pixel(4) + AND mask(4)
+        ICO = (
+            b'\x00\x00'          # reserved
+            b'\x01\x00'          # type: ICO
+            b'\x01\x00'          # 1 image
+            # ICONDIRENTRY
+            b'\x01'              # width 1
+            b'\x01'              # height 1
+            b'\x00'              # color count
+            b'\x00'              # reserved
+            b'\x01\x00'          # planes
+            b'\x20\x00'          # bit count: 32
+            b'\x30\x00\x00\x00'  # size of image data: 48 bytes
+            b'\x16\x00\x00\x00'  # offset to image data: 22
+            # BITMAPINFOHEADER (40 bytes)
+            b'\x28\x00\x00\x00'  # header size
+            b'\x01\x00\x00\x00'  # width
+            b'\x02\x00\x00\x00'  # height (2x for XOR+AND)
+            b'\x01\x00'          # planes
+            b'\x20\x00'          # bit count: 32
+            b'\x00\x00\x00\x00'  # compression: none
+            b'\x00\x00\x00\x00'  # image size
+            b'\x00\x00\x00\x00'  # x pixels/meter
+            b'\x00\x00\x00\x00'  # y pixels/meter
+            b'\x00\x00\x00\x00'  # colors used
+            b'\x00\x00\x00\x00'  # colors important
+            # XOR pixel: 1 pixel, 32-bit BGRA fully transparent
+            b'\x00\x00\x00\x00'
+            # AND mask: 4 bytes (1 row, padded to DWORD) — 1 = transparent
+            b'\x00\x00\x00\x00'
+        )
+        self.send_response(200)
+        self.send_header("Content-Type", "image/x-icon")
+        self.send_header("Content-Length", len(ICO))
+        self.send_header("Cache-Control", "max-age=86400")
+        self.end_headers()
+        self.wfile.write(ICO)
 
     def _serve_static(self, path):
         if path == "/" or path == "":
