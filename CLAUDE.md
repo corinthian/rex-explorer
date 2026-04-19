@@ -14,7 +14,7 @@ Opens at http://localhost:8787. Requires a Last.fm API key in `~/.config/rex/con
 
 ```
 server.py       ThreadingHTTPServer — four API endpoints + static file serving
-lastfm.py       Last.fm client (copied from recommender, extended with artist_search + artist_info)
+lastfm.py       Last.fm client — similar_artists, artist_search, artist_info; file-based cache
 static/
   index.html    Single-page app
   app.js        Graph logic (force-graph, search, expand/collapse, controls)
@@ -40,8 +40,7 @@ static/
 
 - Last.fm deprecated artist images ~2020. Node portraits come from Wikipedia REST API with `_(band)`/`_(musician)` disambiguation fallbacks, then iTunes album art. Nodes fall back to HSL color + initials if no image resolves.
 - Tooltips inside `overflow:hidden` containers (detail panel hero) use a JS floating `div` appended to `<body>`. CSS `::after` tooltips are used for buttons outside those containers.
-- Cache shared with recommender at `~/.cache/rex/` — 7-day TTL, 200ms rate limit. Image URLs cached in-memory per session only.
+- Cache at `~/.cache/rex/` — 7-day TTL, 200ms rate limit. Image URLs cached in-memory per session only.
 - Session-only graph state — in-memory JS Maps. Nothing persists across browser sessions.
-- `lastfm.py` here diverges from the recommender copy — adds `artist_search()` and `artist_info()`. Do not blindly overwrite.
 - Root node name tracked in `rootNodeName` for the center-on-root control.
 - Node charge force: -350. Link distance: 120px.

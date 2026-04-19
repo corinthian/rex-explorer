@@ -45,21 +45,6 @@ class LastFM:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"fetched": time.time(), "data": data}))
 
-    def cache_stats(self) -> dict:
-        if not self.cache_dir.exists():
-            return {"files": 0, "bytes": 0}
-        files = list(self.cache_dir.rglob("*.json"))
-        total = sum(f.stat().st_size for f in files)
-        return {"files": len(files), "bytes": total}
-
-    def cache_clear(self) -> int:
-        if not self.cache_dir.exists():
-            return 0
-        files = list(self.cache_dir.rglob("*.json"))
-        for f in files:
-            f.unlink()
-        return len(files)
-
     # --------------------------------------------------------------- http
 
     def _request(self, method: str, params: dict) -> dict:
@@ -107,61 +92,6 @@ class LastFM:
         })
         artists = data.get("similarartists", {}).get("artist", [])
         return [{"name": a["name"], "match": float(a["match"])} for a in artists]
-
-    def artist_top_tracks(self, artist: str, limit: int = 10) -> list[str]:
-        """Returns list of track names."""
-        data = self._request("artist.getTopTracks", {
-            "artist": artist, "limit": limit, "autocorrect": 1
-        })
-        tracks = data.get("toptracks", {}).get("track", [])
-        return [t["name"] for t in tracks]
-
-    def artist_tags(self, artist: str) -> list[dict]:
-        """Returns list of {name, count} for top tags."""
-        data = self._request("artist.getTopTags", {
-            "artist": artist, "autocorrect": 1
-        })
-        tags = data.get("toptags", {}).get("tag", [])
-        return [{"name": t["name"].lower(), "count": int(t["count"])} for t in tags]
-
-    def track_similar(self, artist: str, track: str, limit: int = 50) -> list[dict]:
-        """Returns list of {name, artist, match}."""
-        data = self._request("track.getSimilar", {
-            "artist": artist, "track": track, "limit": limit, "autocorrect": 1
-        })
-        tracks = data.get("similartracks", {}).get("track", [])
-        return [
-            {"name": t["name"], "artist": t["artist"]["name"], "match": float(t["match"])}
-            for t in tracks
-        ]
-
-    def tag_top_artists(self, tag: str, limit: int = 50) -> list[str]:
-        """Returns list of artist names."""
-        data = self._request("tag.getTopArtists", {"tag": tag, "limit": limit})
-        artists = data.get("topartists", {}).get("artist", [])
-        return [a["name"] for a in artists]
-
-    def user_top_artists(self, username: str, period: str = "overall",
-                         limit: int = 200) -> list[dict]:
-        """Returns list of {name, playcount} for a Last.fm user."""
-        data = self._request("user.getTopArtists", {
-            "user": username, "period": period, "limit": limit
-        })
-        artists = data.get("topartists", {}).get("artist", [])
-        return [{"name": a["name"], "playcount": int(a["playcount"])} for a in artists]
-
-    def user_top_tracks(self, username: str, period: str = "overall",
-                        limit: int = 100) -> list[dict]:
-        """Returns list of {name, artist, playcount}."""
-        data = self._request("user.getTopTracks", {
-            "user": username, "period": period, "limit": limit
-        })
-        tracks = data.get("toptracks", {}).get("track", [])
-        return [
-            {"name": t["name"], "artist": t["artist"]["name"],
-             "playcount": int(t["playcount"])}
-            for t in tracks
-        ]
 
     def artist_search(self, query: str, limit: int = 10) -> list[dict]:
         """Returns list of {name, listeners} matching query."""
