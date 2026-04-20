@@ -439,10 +439,13 @@ async function handleNodeClick(node) {
 
   if (rootNodeName && node.name !== rootNodeName) {
     rootNodeName = node.name;
+    searchInput.value = node.name;
+    searchClear.classList.add("visible");
     connectInput.placeholder = `Find connection from ${node.name}…`;
     connectInput.value = "";
     connectClear.classList.remove("visible");
     connectResults.hidden = true;
+    searchError.hidden = true;
   }
 
   if (node.expanded) {
