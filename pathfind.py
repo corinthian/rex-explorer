@@ -1,20 +1,56 @@
 """Bidirectional Dijkstra over the Last.fm similarity graph."""
 
 import heapq
+import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
 from lastfm import LastFM
+
+WORKERS = 3
+
+logger = logging.getLogger(__name__)
 
 
 def find_chain(lastfm: LastFM, from_name: str, to_name: str,
-               branch: int = 50, budget_per_side: int = 60) -> dict | None:
-    """
-    Find the strongest chain of similar artists between two artists.
+               branch: int = 50, budgets: tuple = (60, 200)) -> dict | None:
+    """Find the strongest chain of similar artists between two artists.
     Returns {from, to, hops, path, total_score} or None.
+    Tries each budget in sequence, returning on first success."""
+    start = time.monotonic()
+    stats_before = dict(lastfm.stats)
+    result = None
+    for budget in budgets:
+        result = _find_chain_once(lastfm, from_name, to_name, branch, budget)
+        if result is not None:
+            break
+    elapsed = time.monotonic() - start
+    s = lastfm.stats
+    delta = {k: s[k] - stats_before[k] for k in s}
+    total = sum(delta.values())
+    if result is not None:
+        logger.info(
+            "chain %s\u2192%s: %d calls (%d cache, %d dedup, %d net) "
+            "elapsed=%.1fs hops=%d score=%.4f",
+            from_name, to_name, total,
+            delta["cache_hit"], delta["dedup_hit"], delta["network"],
+            elapsed, result["hops"], result["total_score"],
+        )
+    else:
+        logger.info(
+            "chain %s\u2192%s: no path; %d calls (%d cache, %d dedup, %d net) elapsed=%.1fs",
+            from_name, to_name, total,
+            delta["cache_hit"], delta["dedup_hit"], delta["network"],
+            elapsed,
+        )
+    return result
 
-    Uses bidirectional Dijkstra: both endpoints expand simultaneously toward
-    each other, each with a priority queue ordered by 1-match (lower = stronger).
-    Stops when the classic bidirectional termination condition holds or both
-    budgets are exhausted. Edge weights are derived from observed similarity
-    scores and treated as undirected (best match wins for each pair).
+
+def _find_chain_once(lastfm: LastFM, from_name: str, to_name: str,
+                     branch: int = 50, budget_per_side: int = 60) -> dict | None:
+    """
+    Single-pass bidirectional Dijkstra over the Last.fm similarity graph.
+    Both endpoints expand simultaneously via ThreadPoolExecutor (WORKERS=3).
+    Stops when the bidirectional termination condition holds or budgets exhaust.
     """
     def lc(s):
         return s.lower()
@@ -30,8 +66,7 @@ def find_chain(lastfm: LastFM, from_name: str, to_name: str,
         }
 
     canon = {from_lc: from_name, to_lc: to_name}
-    # Best match seen for each undirected pair (stored as frozenset for lookup)
-    pair_match = {}  # frozenset({u, v}) -> match
+    pair_match = {}  # frozenset({u, v}) -> best match seen
 
     def record_edge(u, v, match):
         key = frozenset((u, v))
@@ -40,96 +75,119 @@ def find_chain(lastfm: LastFM, from_name: str, to_name: str,
 
     INF = float("inf")
 
-    # Forward state (expanding from from_lc)
     fwd_dist = {from_lc: 0.0}
     fwd_expanded = set()
     fwd_heap = [(0.0, from_lc)]
     fwd_budget = [0]
 
-    # Backward state (expanding from to_lc)
     bwd_dist = {to_lc: 0.0}
     bwd_expanded = set()
     bwd_heap = [(0.0, to_lc)]
     bwd_budget = [0]
 
-    best = INF   # best complete path weight found so far
-    best_mid = None  # the node bridging the two halves
+    best = INF
+    best_mid = None
 
-    def expand_one(heap, dist, expanded, budget, other_dist):
-        nonlocal best, best_mid
+    def top(heap):
+        return heap[0][0] if heap else INF
+
+    def pop_live(heap, dist, expanded):
+        """Pop the best live (non-stale, non-expanded) entry. Returns (d, u) or None."""
         while heap:
             d, u = heapq.heappop(heap)
-            if d > dist.get(u, INF):
+            if d > dist.get(u, INF) or u in expanded:
                 continue
-            if u in expanded:
-                continue
-            expanded.add(u)
-            budget[0] += 1
+            return d, u
+        return None
 
-            artist_display = canon.get(u, u)
-            try:
-                similar = lastfm.similar_artists(artist_display, limit=branch)
-            except Exception:
-                similar = []
-
-            for sim in similar:
-                v = lc(sim["name"])
-                if v == u:
-                    continue  # Last.fm occasionally returns an artist as its own similar
-                if v not in canon:
-                    canon[v] = sim["name"]
-                record_edge(u, v, sim["match"])
-                nd = d + (1.0 - sim["match"])
-                if nd < dist.get(v, INF):
-                    dist[v] = nd
-                    heapq.heappush(heap, (nd, v))
-                # Check if this creates a complete path
-                if v in other_dist:
-                    candidate = nd + other_dist[v]
-                    if candidate < best:
-                        best = candidate
-                        best_mid = v
-
-            # Also check u itself against the other side
-            if u in other_dist:
-                candidate = d + other_dist[u]
+    def integrate(u, d, similar, dist, other_dist, heap):
+        nonlocal best, best_mid
+        for sim in similar:
+            v = lc(sim["name"])
+            if v == u:
+                continue  # Last.fm occasionally returns an artist as its own similar
+            if v not in canon:
+                canon[v] = sim["name"]
+            record_edge(u, v, sim["match"])
+            nd = d + (1.0 - sim["match"])
+            if nd < dist.get(v, INF):
+                dist[v] = nd
+                heapq.heappush(heap, (nd, v))
+            if v in other_dist:
+                candidate = nd + other_dist[v]
                 if candidate < best:
                     best = candidate
-                    best_mid = u
+                    best_mid = v
+        if u in other_dist:
+            candidate = d + other_dist[u]
+            if candidate < best:
+                best = candidate
+                best_mid = u
 
-            return True  # expanded one node
-        return False  # heap empty
+    def _safe_fetch(artist_name):
+        try:
+            return lastfm.similar_artists(artist_name, limit=branch)
+        except Exception:
+            return []
 
-    while (fwd_budget[0] < budget_per_side or bwd_budget[0] < budget_per_side):
-        fwd_top = fwd_heap[0][0] if fwd_heap else INF
-        bwd_top = bwd_heap[0][0] if bwd_heap else INF
+    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        while fwd_budget[0] < budget_per_side or bwd_budget[0] < budget_per_side:
+            ft = top(fwd_heap)
+            bt = top(bwd_heap)
 
-        # Classic bidirectional stopping condition
-        if best < INF and fwd_top + bwd_top >= best:
-            break
-
-        # Expand the side with the smaller frontier value, respecting budgets
-        if fwd_budget[0] < budget_per_side and (fwd_top <= bwd_top or bwd_budget[0] >= budget_per_side):
-            if not expand_one(fwd_heap, fwd_dist, fwd_expanded, fwd_budget, bwd_dist):
-                if bwd_budget[0] >= budget_per_side:
-                    break
-        elif bwd_budget[0] < budget_per_side:
-            if not expand_one(bwd_heap, bwd_dist, bwd_expanded, bwd_budget, fwd_dist):
+            if best < INF and ft + bt >= best:
                 break
-        else:
-            break
+
+            # Collect up to WORKERS candidates using the existing side-selection rule.
+            # Expand all immediately so within-batch duplicate artists skip themselves.
+            candidates = []  # list of ("fwd"|"bwd", u, d)
+            for _ in range(WORKERS):
+                ft = top(fwd_heap)
+                bt = top(bwd_heap)
+                use_fwd = (fwd_budget[0] < budget_per_side and
+                           (ft <= bt or bwd_budget[0] >= budget_per_side))
+                if use_fwd:
+                    cand = pop_live(fwd_heap, fwd_dist, fwd_expanded)
+                    if cand is not None:
+                        d, u = cand
+                        fwd_expanded.add(u)
+                        fwd_budget[0] += 1
+                        candidates.append(("fwd", u, d))
+                        continue
+                    if bwd_budget[0] >= budget_per_side:
+                        break
+                    # fwd heap exhausted; fall through to try bwd
+                if bwd_budget[0] < budget_per_side:
+                    cand = pop_live(bwd_heap, bwd_dist, bwd_expanded)
+                    if cand is None:
+                        break
+                    d, u = cand
+                    bwd_expanded.add(u)
+                    bwd_budget[0] += 1
+                    candidates.append(("bwd", u, d))
+                else:
+                    break
+
+            if not candidates:
+                break
+
+            futures = [ex.submit(_safe_fetch, canon.get(u, u)) for (_, u, _) in candidates]
+            results = [f.result() for f in futures]
+
+            for (side, u, d), similar in zip(candidates, results):
+                if side == "fwd":
+                    integrate(u, d, similar, fwd_dist, bwd_dist, fwd_heap)
+                else:
+                    integrate(u, d, similar, bwd_dist, fwd_dist, bwd_heap)
 
     if best_mid is None:
-        # Direct path: maybe to_lc ended up in fwd_dist
         if to_lc in fwd_dist:
             best_mid = to_lc
             best = fwd_dist[to_lc]
         else:
             return None
 
-    # Reconstruct the path.
-    # Build a combined undirected adjacency from pair_match for shortest-path tracing.
-    # We re-run Dijkstra on the discovered subgraph for accurate prev pointers.
+    # Reconstruct path: re-run Dijkstra on the discovered subgraph for accurate prev pointers.
     adj = {}
     for pair, match in pair_match.items():
         if len(pair) < 2:
@@ -157,7 +215,6 @@ def find_chain(lastfm: LastFM, from_name: str, to_name: str,
     if to_lc not in dist2:
         return None
 
-    # Trace path back
     path_lc = []
     cur = to_lc
     seen = set()
