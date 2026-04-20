@@ -170,7 +170,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             result = find_chain(get_client(), a, b)
             if result is None:
-                return self._error("no chain found within bounds", 404)
+                return self._json({"error": "no chain found within bounds"})
             self._json(result)
         except LastFMError as e:
             self._error(str(e))
