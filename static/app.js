@@ -437,6 +437,14 @@ async function showDetail(name) {
 async function handleNodeClick(node) {
   showDetail(node.name);
 
+  if (rootNodeName && node.name !== rootNodeName) {
+    rootNodeName = node.name;
+    connectInput.placeholder = `Find connection from ${node.name}…`;
+    connectInput.value = "";
+    connectClear.classList.remove("visible");
+    connectResults.hidden = true;
+  }
+
   if (node.expanded) {
     collapseNode(node);
     return;
