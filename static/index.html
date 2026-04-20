@@ -12,11 +12,21 @@
     <div id="search-landing">
       <div id="search-app-name">Rex Explorer</div>
     </div>
-    <div id="search-input-wrap">
-      <input id="search-input" type="text" placeholder="Search for an artist…" autocomplete="off" spellcheck="false">
-      <button id="search-clear" aria-label="Clear search">×</button>
-      <ul id="search-results" hidden></ul>
+    <div id="search-row">
+      <div id="search-input-wrap">
+        <input id="search-input" type="text" placeholder="Search for an artist…" autocomplete="off" spellcheck="false">
+        <button id="search-clear" aria-label="Clear search">×</button>
+        <ul id="search-results" hidden></ul>
+      </div>
+      <div id="connect-wrap" hidden>
+        <input id="connect-input" type="text" placeholder="Find connection from…" autocomplete="off" spellcheck="false">
+        <button id="connect-clear" aria-label="Clear">×</button>
+        <ul id="connect-results" hidden></ul>
+      </div>
+      <div id="connect-spacer" hidden></div>
+      <button id="clear-chain" hidden>Clear chain</button>
     </div>
+    <div id="connect-hint" hidden>Search a second artist to trace the path between them.</div>
     <div id="search-tagline">Explore the world around any artist</div>
     <div id="search-error" hidden>No results for that artist — try another name</div>
   </div>

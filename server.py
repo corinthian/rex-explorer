@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lastfm import LastFM, LastFMError
+from pathfind import find_chain
 
 PORT = 8787
 STATIC_DIR = Path(__file__).parent / "static"
@@ -125,6 +126,8 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_similar(params)
         elif path == "/api/image":
             self._handle_image(params)
+        elif path == "/api/chain":
+            self._handle_chain(params)
         else:
             self._serve_static(path)
 
@@ -156,6 +159,19 @@ class Handler(BaseHTTPRequestHandler):
             limit = int(params.get("limit", 5))
             results = get_client().similar_artists(artist, limit=limit)
             self._json(results)
+        except LastFMError as e:
+            self._error(str(e))
+
+    def _handle_chain(self, params):
+        a = params.get("from", "").strip()
+        b = params.get("to", "").strip()
+        if not a or not b:
+            return self._error("missing from or to", 400)
+        try:
+            result = find_chain(get_client(), a, b)
+            if result is None:
+                return self._error("no chain found within bounds", 404)
+            self._json(result)
         except LastFMError as e:
             self._error(str(e))
 
