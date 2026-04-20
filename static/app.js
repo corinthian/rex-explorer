@@ -603,6 +603,8 @@ const connectWrap = document.getElementById("connect-wrap");
 const connectInput = document.getElementById("connect-input");
 const connectClear = document.getElementById("connect-clear");
 const connectResults = document.getElementById("connect-results");
+const connectHint = document.getElementById("connect-hint");
+const connectSpacer = document.getElementById("connect-spacer");
 let connectTimer = null;
 
 connectInput.addEventListener("input", () => {
@@ -802,6 +804,8 @@ async function addRootArtist(name) {
     rootNodeName = canonName;
     connectInput.placeholder = `Find connection from ${canonName}…`;
     connectWrap.hidden = false;
+    connectHint.hidden = false;
+    connectSpacer.hidden = false;
 
     refreshGraph();
     document.getElementById("controls").classList.add("controls-visible");

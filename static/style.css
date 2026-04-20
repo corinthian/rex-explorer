@@ -48,7 +48,7 @@ body.graph-active #search-panel {
   top: 18px;
   left: 18px;
   transform: translate(0, 0);
-  width: 280px;
+  width: 520px;
 }
 
 /* Landing branding */
@@ -78,9 +78,18 @@ body.graph-active #search-landing {
   text-shadow: 0 0 24px #0d0d0d, 0 0 48px #0d0d0d;
 }
 
+/* Search row — horizontal layout */
+#search-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
 /* Input wrapper */
 #search-input-wrap {
   position: relative;
+  flex: 2;
+  min-width: 0;
 }
 
 #search-input {
@@ -151,7 +160,12 @@ body.graph-active #search-landing {
 /* Connect-to input — amber-family accent, mirrors primary search */
 #connect-wrap {
   position: relative;
-  margin-top: 6px;
+  flex: 2;
+  min-width: 0;
+}
+
+#connect-spacer {
+  flex: 1;
 }
 
 #connect-input {
@@ -214,7 +228,7 @@ body.graph-active #search-landing {
 
 #connect-hint {
   font-size: 11px;
-  color: #555;
+  color: #888;
   text-align: center;
   padding: 6px 14px 0;
   letter-spacing: 0.02em;
@@ -222,17 +236,16 @@ body.graph-active #search-landing {
 
 /* Clear chain button */
 #clear-chain {
-  display: block;
-  width: 100%;
-  margin-top: 6px;
-  padding: 5px;
+  flex: none;
+  align-self: stretch;
+  padding: 5px 10px;
   background: none;
   border: 1px solid #333;
   border-radius: 6px;
   color: #888;
   font-size: 12px;
   cursor: pointer;
-  text-align: center;
+  white-space: nowrap;
   transition: color 0.1s, border-color 0.1s;
 }
 #clear-chain:hover { color: #e05a54; border-color: #e05a54; }
@@ -257,7 +270,7 @@ body.graph-active #search-tagline {
 /* Search error */
 #search-error {
   font-size: 12px;
-  color: #666;
+  color: #999;
   text-align: center;
   padding: 8px 14px 0;
 }
