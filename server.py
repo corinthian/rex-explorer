@@ -1,6 +1,7 @@
 """Rex Explorer — HTTP server wrapping the Last.fm client."""
 
 import json
+import logging
 import mimetypes
 import os
 import sys
@@ -13,6 +14,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from lastfm import LastFM, LastFMError
 from pathfind import find_chain
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 PORT = 8787
 STATIC_DIR = Path(__file__).parent / "static"
