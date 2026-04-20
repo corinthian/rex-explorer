@@ -17,8 +17,15 @@
       <button id="search-clear" aria-label="Clear search">×</button>
       <ul id="search-results" hidden></ul>
     </div>
+    <div id="connect-wrap" hidden>
+      <input id="connect-input" type="text" placeholder="Find connection from…" autocomplete="off" spellcheck="false">
+      <button id="connect-clear" aria-label="Clear">×</button>
+      <ul id="connect-results" hidden></ul>
+      <div id="connect-hint">Search a second artist to trace the path between them.</div>
+    </div>
     <div id="search-tagline">Explore the world around any artist</div>
     <div id="search-error" hidden>No results for that artist — try another name</div>
+    <button id="clear-chain" hidden>Clear chain</button>
   </div>
 
   <div id="bg-graph"></div>

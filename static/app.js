@@ -56,6 +56,7 @@ const nodes = new Map();   // name -> node object
 const links = [];          // {source, target, match}
 const detailCache = new Map(); // name -> artist info
 let rootNodeName = null;   // name of the first/current root artist
+const chainLinkKeys = new Set(); // sorted link keys currently part of the chain
 
 // ------------------------------------------------------------------ pointer tracking
 
@@ -141,8 +142,8 @@ const Graph = ForceGraph()(graphEl)
     ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
     ctx.fill();
   })
-  .linkWidth(link => Math.max(0.5, (link.match || 0) * 3))
-  .linkColor(() => "rgba(255,255,255,0.12)")
+  .linkWidth(link => link.chain ? 4 : Math.max(0.5, (link.match || 0) * 3))
+  .linkColor(link => link.chain ? '#f0b060' : "rgba(255,255,255,0.12)")
   .nodeLabel('')
   .onNodeClick(handleNodeClick)
   .d3AlphaDecay(0.03)
@@ -539,7 +540,10 @@ searchInput.addEventListener("keydown", e => {
 });
 
 document.addEventListener("click", e => {
-  if (!e.target.closest("#search-panel")) searchResults.hidden = true;
+  if (!e.target.closest("#search-panel")) {
+    searchResults.hidden = true;
+    connectResults.hidden = true;
+  }
 });
 
 async function doSearch(q) {
@@ -552,32 +556,79 @@ async function doSearch(q) {
   }
 }
 
-function renderSearchResults(results) {
-  if (!results.length) {
-    searchResults.hidden = true;
-    searchError.hidden = false;
-    return;
-  }
-  searchError.hidden = true;
-  searchResults.innerHTML = results.map(r => `
+function renderResultItems(listEl, results, onPick) {
+  listEl.innerHTML = results.map(r => `
     <li data-name="${escHtml(r.name)}">
       <span class="result-name">${escHtml(r.name)}</span>
       <span class="result-listeners">${r.listeners ? fmtListeners(r.listeners) : ""}</span>
     </li>
   `).join("");
-  searchResults.hidden = false;
-
-  searchResults.querySelectorAll("li").forEach(li => {
-    li.addEventListener("click", () => {
-      const name = li.dataset.name;
-      searchInput.value = name;
-      searchResults.hidden = true;
-      document.body.classList.add("graph-active");
-      BgGraph.pauseAnimation();
-      addRootArtist(name);
-    });
+  listEl.hidden = false;
+  listEl.querySelectorAll("li").forEach(li => {
+    li.addEventListener("click", () => onPick(li.dataset.name));
   });
 }
+
+function renderSearchResults(results) {
+  if (!results.length) {
+    searchResults.hidden = true;
+    searchError.textContent = "No results for that artist — try another name";
+    searchError.hidden = false;
+    return;
+  }
+  searchError.hidden = true;
+  renderResultItems(searchResults, results, name => {
+    searchInput.value = name;
+    searchResults.hidden = true;
+    document.body.classList.add("graph-active");
+    BgGraph.pauseAnimation();
+    addRootArtist(name);
+  });
+}
+
+// ------------------------------------------------------------------ connect input
+
+const connectWrap = document.getElementById("connect-wrap");
+const connectInput = document.getElementById("connect-input");
+const connectClear = document.getElementById("connect-clear");
+const connectResults = document.getElementById("connect-results");
+let connectTimer = null;
+
+connectInput.addEventListener("input", () => {
+  connectClear.classList.toggle("visible", connectInput.value.length > 0);
+  clearTimeout(connectTimer);
+  const q = connectInput.value.trim();
+  if (!q) { connectResults.hidden = true; return; }
+  connectTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (!data.length) { connectResults.hidden = true; return; }
+      renderResultItems(connectResults, data, name => {
+        connectInput.value = "";
+        connectClear.classList.remove("visible");
+        connectResults.hidden = true;
+        addChainTo(name);
+      });
+    } catch (e) {
+      connectResults.hidden = true;
+    }
+  }, 300);
+});
+
+connectClear.addEventListener("click", () => {
+  connectInput.value = "";
+  connectClear.classList.remove("visible");
+  connectResults.hidden = true;
+  connectInput.focus();
+});
+
+connectInput.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    connectResults.hidden = true;
+    connectInput.blur();
+  }
+});
 
 function escHtml(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -633,6 +684,87 @@ document.getElementById("btn-center").addEventListener("click", () => {
 
 // ------------------------------------------------------------------ root artist
 
+// ------------------------------------------------------------------ chain
+
+const clearChainBtn = document.getElementById("clear-chain");
+
+function clearChain() {
+  for (const l of links) {
+    if (l.chain) l.chain = false;
+  }
+  chainLinkKeys.clear();
+  clearChainBtn.hidden = true;
+  refreshGraph();
+}
+
+clearChainBtn.addEventListener("click", clearChain);
+
+async function addChainTo(targetName) {
+  startLoading();
+  try {
+    const res = await fetch(
+      `/api/chain?from=${encodeURIComponent(rootNodeName)}&to=${encodeURIComponent(targetName)}`
+    );
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      searchError.textContent = data.error || "no chain found";
+      searchError.hidden = false;
+      return;
+    }
+
+    const path = data.path;
+    clearChain();
+
+    // Capture endpoint positions before adding new nodes
+    const rootNode = nodes.get(rootNodeName);
+    const existingTarget = nodes.get(targetName);
+    const rx = rootNode?.x ?? 0;
+    const ry = rootNode?.y ?? 0;
+    const tx = existingTarget?.x ?? rx + 400;
+    const ty = existingTarget?.y ?? ry + 400;
+
+    // Add chain nodes, placing new ones along the line between endpoints
+    for (let i = 0; i < path.length; i++) {
+      const n = addNode(path[i].name, hashColor(path[i].name), initials(path[i].name));
+      if (n.x == null) {
+        const t = path.length > 1 ? i / (path.length - 1) : 0.5;
+        n.x = rx + (tx - rx) * t + (Math.random() - 0.5) * 50;
+        n.y = ry + (ty - ry) * t + (Math.random() - 0.5) * 50;
+      }
+    }
+
+    // Add links and collect chain keys
+    const newKeys = new Set();
+    for (let i = 0; i < path.length - 1; i++) {
+      const a = path[i].name;
+      const b = path[i + 1].name;
+      const match = path[i].match_to_next || 0;
+      addLink(a, b, match);
+      newKeys.add([a, b].sort().join("|||"));
+    }
+
+    // Tag link objects as chain
+    for (const l of links) {
+      const la = l.source?.id ?? l.source;
+      const lb = l.target?.id ?? l.target;
+      const key = [la, lb].sort().join("|||");
+      if (newKeys.has(key)) {
+        l.chain = true;
+        chainLinkKeys.add(key);
+      }
+    }
+
+    clearChainBtn.hidden = false;
+    refreshGraph();
+    reheat();
+    setTimeout(() => Graph.zoomToFit(600, 60), 800);
+  } catch (e) {
+    console.error("addChainTo failed:", e);
+  } finally {
+    stopLoading();
+  }
+}
+
 async function addRootArtist(name) {
   startLoading();
   try {
@@ -657,6 +789,8 @@ async function addRootArtist(name) {
     if (!info.error) detailCache.set(canonName, info);
     showDetail(canonName);
     rootNodeName = canonName;
+    connectInput.placeholder = `Find connection from ${canonName}…`;
+    connectWrap.hidden = false;
 
     refreshGraph();
     document.getElementById("controls").classList.add("controls-visible");
