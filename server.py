@@ -1,9 +1,11 @@
 """Rex Explorer — HTTP server wrapping the Last.fm client."""
 
 import json
+import logging
 import mimetypes
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -13,6 +15,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from lastfm import LastFM, LastFMError
 from pathfind import find_chain
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 PORT = 8787
 STATIC_DIR = Path(__file__).parent / "static"
@@ -38,6 +42,8 @@ def _load_api_key() -> str:
 
 _client: LastFM | None = None
 _image_cache: dict = {}  # artist name -> image URL or None
+_no_chain_cache: dict = {}  # frozenset({a_lc, b_lc}) -> timestamp
+_NO_CHAIN_TTL = 86400  # 24 h
 
 
 def get_client() -> LastFM:
@@ -167,10 +173,15 @@ class Handler(BaseHTTPRequestHandler):
         b = params.get("to", "").strip()
         if not a or not b:
             return self._error("missing from or to", 400)
+        cache_key = frozenset((a.lower(), b.lower()))
+        cached_at = _no_chain_cache.get(cache_key)
+        if cached_at is not None and time.time() - cached_at < _NO_CHAIN_TTL:
+            return self._json({"error": "No path found — these artists may not be connected in Last.fm's similarity graph."})
         try:
             result = find_chain(get_client(), a, b)
             if result is None:
-                return self._json({"error": "no chain found within bounds"})
+                _no_chain_cache[cache_key] = time.time()
+                return self._json({"error": "No path found — these artists may not be connected in Last.fm's similarity graph."})
             self._json(result)
         except LastFMError as e:
             self._error(str(e))

@@ -2,15 +2,18 @@
 
 import hashlib
 import json
+import os
+import threading
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
+from concurrent.futures import Future
 from pathlib import Path
+
+import requests
+from requests.adapters import HTTPAdapter
 
 BASE_URL = "https://ws.audioscrobbler.com/2.0/"
 CACHE_TTL = 7 * 24 * 3600  # 7 days
-MIN_REQUEST_INTERVAL = 0.2  # 200ms = ~5 req/sec
+MIN_REQUEST_INTERVAL = 0.2  # 200ms = ~5 req/sec; override via REX_LASTFM_INTERVAL_MS
 
 
 class LastFMError(Exception):
@@ -21,7 +24,24 @@ class LastFM:
     def __init__(self, api_key: str, cache_dir: Path = None):
         self.api_key = api_key
         self.cache_dir = cache_dir or Path.home() / ".cache" / "rex"
+
+        interval_ms = int(os.environ.get("REX_LASTFM_INTERVAL_MS",
+                                         int(MIN_REQUEST_INTERVAL * 1000)))
+        # Lowering below 200ms may provoke Last.fm rate-limit cooldown (error 29).
+        # TOS averages over 5min but enforcement is stricter in practice.
+        self._min_interval = interval_ms / 1000.0
+
         self._last_request = 0.0
+        self._request_lock = threading.Lock()
+
+        self._inflight: dict[str, Future] = {}
+        self._inflight_lock = threading.Lock()
+
+        self._session = requests.Session()
+        adapter = HTTPAdapter(pool_connections=1, pool_maxsize=8)
+        self._session.mount("https://", adapter)
+
+        self.stats = {"cache_hit": 0, "dedup_hit": 0, "network": 0}
 
     # ------------------------------------------------------------------ cache
 
@@ -49,39 +69,67 @@ class LastFM:
 
     def _request(self, method: str, params: dict) -> dict:
         params = {**params, "method": method, "api_key": self.api_key, "format": "json"}
-        cache_path = self._cache_path(method, {k: v for k, v in params.items()
-                                                if k not in ("api_key", "format")})
+        cache_key_params = {k: v for k, v in params.items()
+                            if k not in ("api_key", "format")}
+        cache_path = self._cache_path(method, cache_key_params)
+
         cached = self._cache_get(cache_path)
         if cached is not None:
+            self.stats["cache_hit"] += 1
             return cached
 
-        # rate limit
-        elapsed = time.time() - self._last_request
-        if elapsed < MIN_REQUEST_INTERVAL:
-            time.sleep(MIN_REQUEST_INTERVAL - elapsed)
+        inflight_key = method + json.dumps(sorted(cache_key_params.items()))
 
-        url = BASE_URL + "?" + urllib.parse.urlencode(params)
-        req = urllib.request.Request(url, headers={"User-Agent": "rex-musicrec/1.0"})
+        with self._inflight_lock:
+            fut = self._inflight.get(inflight_key)
+            if fut is None:
+                fut = Future()
+                self._inflight[inflight_key] = fut
+                owner = True
+            else:
+                owner = False
+
+        if not owner:
+            self.stats["dedup_hit"] += 1
+            return fut.result()  # blocks; re-raises on failure
+
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = json.loads(resp.read().decode())
-        except urllib.error.HTTPError as e:
-            body = e.read().decode()
+            # Serialize throttle wait; record dispatch time before releasing lock
+            with self._request_lock:
+                elapsed = time.time() - self._last_request
+                if elapsed < self._min_interval:
+                    time.sleep(self._min_interval - elapsed)
+                self._last_request = time.time()
+
+            resp = self._session.get(
+                BASE_URL, params=params,
+                headers={"User-Agent": "rex-musicrec/1.0"}, timeout=15
+            )
             try:
-                data = json.loads(body)
+                data = resp.json()
             except Exception:
-                raise LastFMError(f"HTTP {e.code}: {body[:200]}")
+                resp.raise_for_status()
+                raise LastFMError(f"HTTP {resp.status_code}: non-JSON response")
+
+            if "error" in data:
+                if data["error"] == 6:
+                    data = {}
+                else:
+                    raise LastFMError(
+                        f"Last.fm error {data['error']}: {data.get('message', '')}"
+                    )
+
+            if data:
+                self._cache_put(cache_path, data)
+            self.stats["network"] += 1
+            fut.set_result(data)
+            return data
+        except Exception as e:
+            fut.set_exception(e)
+            raise
         finally:
-            self._last_request = time.time()
-
-        if "error" in data:
-            # error 6 = artist/track not found — not fatal
-            if data["error"] == 6:
-                return {}
-            raise LastFMError(f"Last.fm error {data['error']}: {data.get('message', '')}")
-
-        self._cache_put(cache_path, data)
-        return data
+            with self._inflight_lock:
+                self._inflight.pop(inflight_key, None)
 
     # ------------------------------------------------------------- methods
 
