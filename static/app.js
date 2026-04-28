@@ -865,3 +865,4 @@ async function addRootArtist(name) {
     stopLoading();
   }
 }
+

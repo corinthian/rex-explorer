@@ -524,3 +524,72 @@ body.graph-active #search-tagline {
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+/* Landing popup — disclaimer, mirrors detail-panel framing + hover slide-up */
+#landing-popup {
+  position: absolute;
+  bottom: 18px;
+  left: 18px;
+  z-index: 50;
+  width: 600px;
+  max-width: calc(100vw - 36px);
+  background: #161616;
+  border: 1px solid #2e2e2e;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+
+body.graph-active #landing-popup {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease-in-out;
+}
+
+#landing-popup-header {
+  padding: 14px 16px 14px;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.25s;
+}
+
+#landing-popup:hover #landing-popup-header {
+  border-color: #2a2a2a;
+}
+
+#landing-popup-title {
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: 0.1em;
+  color: #d0d0d0;
+  text-transform: uppercase;
+  line-height: 1.2;
+  text-shadow: 0 0 24px #0d0d0d, 0 0 48px #0d0d0d;
+}
+
+#landing-popup-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#landing-popup:hover #landing-popup-body {
+  max-height: 240px;
+}
+
+#landing-popup-body-inner {
+  padding: 12px 16px 16px;
+}
+
+#landing-popup p {
+  font-size: 13px;
+  line-height: 1.65;
+  color: #aaa;
+  margin-bottom: 8px;
+}
+#landing-popup p:last-child { margin-bottom: 0; }
+
+#landing-popup a {
+  color: #d0d0d0;
+  text-decoration: underline;
+}
+#landing-popup a:hover { color: #fff; }
