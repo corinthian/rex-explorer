@@ -101,14 +101,20 @@ class LastFM:
                     time.sleep(self._min_interval - elapsed)
                 self._last_request = time.time()
 
-            resp = self._session.get(
-                BASE_URL, params=params,
-                headers={"User-Agent": "rex-musicrec/1.0"}, timeout=15
-            )
+            try:
+                resp = self._session.get(
+                    BASE_URL, params=params,
+                    headers={"User-Agent": "rex-musicrec/1.0"}, timeout=15
+                )
+            except requests.RequestException as e:
+                raise LastFMError(f"network error: {e}") from e
             try:
                 data = resp.json()
             except Exception:
-                resp.raise_for_status()
+                try:
+                    resp.raise_for_status()
+                except requests.RequestException as e:
+                    raise LastFMError(f"network error: {e}") from e
                 raise LastFMError(f"HTTP {resp.status_code}: non-JSON response")
 
             if "error" in data:
