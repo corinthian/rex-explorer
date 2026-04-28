@@ -62,14 +62,14 @@ def _rank_search_results(query: str, results: list[dict], top: int = 10) -> list
         n_lc = name.lower()
         listeners = max(int(item.get("listeners", 0)), 1)
         if n_lc == q_lc:
-            match = 1000.0
+            factor = 1.5
         elif n_lc.startswith(q_lc):
-            match = 500.0
+            factor = 1.0
         elif q_lc in n_lc:
-            match = 100.0
+            factor = 0.6
         else:
-            match = 0.0
-        return match + math.log10(listeners)
+            factor = 0.2
+        return factor * math.log10(listeners)
 
     ranked = sorted(results, key=score, reverse=True)
     return ranked[:top]
