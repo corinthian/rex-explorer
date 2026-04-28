@@ -417,12 +417,14 @@ async function showDetail(name) {
     try {
       const res = await fetch(`/api/artist?name=${encodeURIComponent(name)}`);
       info = await res.json();
+      if (detailPanel.hidden || detailName.textContent !== name) return;
       if (!info.error) detailCache.set(name, info);
     } catch (e) {
       return;
     }
   }
   if (info.error) return;
+  if (detailPanel.hidden || detailName.textContent !== name) return;
 
   detailName.textContent = info.name || name;
   detailListeners.textContent = info.listeners ? fmtListeners(info.listeners) : "";
@@ -454,11 +456,16 @@ async function handleNodeClick(node) {
   }
 
   node.expanded = true;
+  node.abortController = new AbortController();
   startLoading();
 
   try {
-    const res = await fetch(`/api/similar?artist=${encodeURIComponent(node.name)}&limit=5`);
+    const res = await fetch(
+      `/api/similar?artist=${encodeURIComponent(node.name)}&limit=5`,
+      { signal: node.abortController.signal }
+    );
     const similar = await res.json();
+    if (!node.expanded) return;
     if (res.ok && Array.isArray(similar)) {
       for (const s of similar) {
         addNode(s.name, hashColor(s.name), initials(s.name));
@@ -468,13 +475,19 @@ async function handleNodeClick(node) {
       reheat();
     }
   } catch (e) {
+    if (e.name === 'AbortError') return;
     console.error("expand failed:", e);
   } finally {
+    if (node.abortController) node.abortController = null;
     stopLoading();
   }
 }
 
 function collapseNode(node) {
+  if (node.abortController) {
+    node.abortController.abort();
+    node.abortController = null;
+  }
   const childNames = links
     .filter(l => {
       const a = l.source?.id ?? l.source;
@@ -557,12 +570,24 @@ document.addEventListener("click", e => {
   }
 });
 
+let searchVersion = 0;
+
 async function doSearch(q) {
+  const myVersion = ++searchVersion;
   try {
     const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
     const data = await res.json();
+    if (myVersion !== searchVersion) return;
+    if (searchInput.value.trim() !== q) return;
+    if (!res.ok || (data && data.error)) {
+      searchResults.hidden = true;
+      searchError.textContent = (data && data.error) || "Search failed";
+      searchError.hidden = false;
+      return;
+    }
     renderSearchResults(data);
   } catch (e) {
+    if (myVersion !== searchVersion) return;
     searchResults.hidden = true;
   }
 }
@@ -581,6 +606,12 @@ function renderResultItems(listEl, results, onPick) {
 }
 
 function renderSearchResults(results) {
+  if (!Array.isArray(results)) {
+    searchResults.hidden = true;
+    searchError.textContent = "Search failed";
+    searchError.hidden = false;
+    return;
+  }
   if (!results.length) {
     searchResults.hidden = true;
     searchError.textContent = "No results for that artist — try another name";
@@ -606,6 +637,7 @@ const connectResults = document.getElementById("connect-results");
 const connectHint = document.getElementById("connect-hint");
 const connectSpacer = document.getElementById("connect-spacer");
 let connectTimer = null;
+let connectVersion = 0;
 
 connectInput.addEventListener("input", () => {
   connectClear.classList.toggle("visible", connectInput.value.length > 0);
@@ -613,10 +645,19 @@ connectInput.addEventListener("input", () => {
   const q = connectInput.value.trim();
   if (!q) { connectResults.hidden = true; return; }
   connectTimer = setTimeout(async () => {
+    const myVersion = ++connectVersion;
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
-      if (!data.length) { connectResults.hidden = true; return; }
+      if (myVersion !== connectVersion) return;
+      if (connectInput.value.trim() !== q) return;
+      if (!res.ok || (data && data.error)) {
+        connectResults.hidden = true;
+        searchError.textContent = (data && data.error) || "Search failed";
+        searchError.hidden = false;
+        return;
+      }
+      if (!Array.isArray(data) || !data.length) { connectResults.hidden = true; return; }
       renderResultItems(connectResults, data, name => {
         connectInput.value = "";
         connectClear.classList.remove("visible");
@@ -624,6 +665,7 @@ connectInput.addEventListener("input", () => {
         addChainTo(name);
       });
     } catch (e) {
+      if (myVersion !== connectVersion) return;
       connectResults.hidden = true;
     }
   }, 300);
@@ -778,7 +820,10 @@ async function addChainTo(targetName) {
   }
 }
 
+let addRootVersion = 0;
+
 async function addRootArtist(name) {
+  const myVersion = ++addRootVersion;
   startLoading();
   try {
     const [infoRes, simRes] = await Promise.all([
@@ -786,6 +831,7 @@ async function addRootArtist(name) {
       fetch(`/api/similar?artist=${encodeURIComponent(name)}&limit=5`),
     ]);
     const [info, similar] = await Promise.all([infoRes.json(), simRes.json()]);
+    if (myVersion !== addRootVersion) return;
 
     const canonName = info.name || name;
     const color = hashColor(canonName);

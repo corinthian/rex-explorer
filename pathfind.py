@@ -124,12 +124,6 @@ def _find_chain_once(lastfm: LastFM, from_name: str, to_name: str,
                 best = candidate
                 best_mid = u
 
-    def _safe_fetch(artist_name):
-        try:
-            return lastfm.similar_artists(artist_name, limit=branch)
-        except Exception:
-            return []
-
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         while fwd_budget[0] < budget_per_side or bwd_budget[0] < budget_per_side:
             ft = top(fwd_heap)
@@ -171,7 +165,7 @@ def _find_chain_once(lastfm: LastFM, from_name: str, to_name: str,
             if not candidates:
                 break
 
-            futures = [ex.submit(_safe_fetch, canon.get(u, u)) for (_, u, _) in candidates]
+            futures = [ex.submit(lastfm.similar_artists, canon.get(u, u), branch) for (_, u, _) in candidates]
             results = [f.result() for f in futures]
 
             for (side, u, d), similar in zip(candidates, results):
