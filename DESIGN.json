@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-04-29T00:00:00Z",
+  "title": "Design System: Rex Explorer",
+  "extensions": {
+    "colorMeta": {
+      "bg-base": { "role": "neutral", "displayName": "Hall", "canonical": "oklch(14% 0 0)" },
+      "bg-surface": { "role": "neutral", "displayName": "Catalog Card", "canonical": "oklch(17% 0 0)" },
+      "bg-input": { "role": "neutral", "displayName": "Drawer", "canonical": "oklch(19% 0 0)" },
+      "bg-elevated": { "role": "neutral", "displayName": "Brass Edge", "canonical": "oklch(23% 0 0)" },
+      "bg-hover": { "role": "neutral", "displayName": "Hover Wash", "canonical": "oklch(25% 0 0)" },
+      "bg-chip": { "role": "neutral", "displayName": "Chip Stock", "canonical": "oklch(24% 0 0)" },
+      "border-panel": { "role": "neutral", "displayName": "Hairline Steel", "canonical": "oklch(28% 0 0)" },
+      "border-control": { "role": "neutral", "displayName": "Wire", "canonical": "oklch(30% 0 0)" },
+      "border-chip": { "role": "neutral", "displayName": "Chip Edge", "canonical": "oklch(33% 0 0)" },
+      "border-row": { "role": "neutral", "displayName": "Row Rule", "canonical": "oklch(27% 0 0)" },
+      "text-primary": { "role": "neutral", "displayName": "Lamp White", "canonical": "oklch(100% 0 0)" },
+      "text-body": { "role": "neutral", "displayName": "Reading White", "canonical": "oklch(89% 0 0)" },
+      "text-display": { "role": "neutral", "displayName": "Display White", "canonical": "oklch(85% 0 0)" },
+      "text-tag": { "role": "neutral", "displayName": "Tag Text", "canonical": "oklch(82% 0 0)" },
+      "text-muted": { "role": "neutral", "displayName": "Quiet Gray", "canonical": "oklch(72% 0 0)" },
+      "text-secondary": { "role": "neutral", "displayName": "Index Gray", "canonical": "oklch(60% 0 0)" },
+      "text-faint": { "role": "neutral", "displayName": "Spine Gray", "canonical": "oklch(35% 0 0)" },
+      "accent-vinyl-red": { "role": "primary", "displayName": "Faded Vinyl Red", "canonical": "oklch(63% 0.16 22)" },
+      "accent-vinyl-red-hover": { "role": "primary", "displayName": "Faded Vinyl Red (hover)", "canonical": "oklch(70% 0.16 22)" },
+      "amber-border": { "role": "secondary", "displayName": "Amber Trace", "canonical": "oklch(28% 0.04 70)" },
+      "amber-focus": { "role": "secondary", "displayName": "Amber Focus", "canonical": "oklch(42% 0.07 70)" },
+      "amber-placeholder": { "role": "secondary", "displayName": "Amber Placeholder", "canonical": "oklch(38% 0.05 70)" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The wide-tracked uppercase wordmark in the landing search panel and the landing-popup header. Two surfaces only." },
+      "headline": { "displayName": "Headline", "purpose": "The artist name in the detail-panel hero." },
+      "body": { "displayName": "Body", "purpose": "Default text in inputs and the listener-count line." },
+      "bio": { "displayName": "Bio", "purpose": "Slide-up artist biography prose, intentionally smaller and looser than body." },
+      "label": { "displayName": "Label", "purpose": "Tagline, hints, the loading indicator, search-result listener counts, the external Last.fm link." },
+      "caption": { "displayName": "Caption", "purpose": "Tag chips and secondary metadata." }
+    },
+    "shadows": [
+      { "name": "lifted-panel", "value": "0 8px 32px rgba(0, 0, 0, 0.6)", "purpose": "The single elevation tier in the system. Used on the detail-panel and the landing-popup. Long, soft, low-opacity — the shadow of a heavy book on a desk in low light." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "The slide-up panel body transition over 0.35s on max-height. The signature gesture of the system." },
+      { "name": "ease-fade", "value": "ease-in-out", "purpose": "Search panel reposition on graph activation (0.35s) and background-graph fade-out (1s)." },
+      { "name": "ease-quick", "value": "linear", "purpose": "Hover state changes on inputs, controls, and chips (0.1s–0.25s). Quiet, immediate." }
+    ],
+    "breakpoints": [],
+    "principles": {
+      "ban-side-stripe-borders": true,
+      "ban-gradient-text": true,
+      "ban-glassmorphism": true,
+      "ban-em-dashes": true,
+      "max-elevation-tiers": 1
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Search Input",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "The artist search input. Landing-centered before any selection, slides to top-left when a graph is active.",
+      "html": "<div class=\"ds-input-wrap\"><input class=\"ds-input-search\" type=\"text\" placeholder=\"Search for an artist…\" /><button class=\"ds-input-clear\" aria-label=\"Clear search\">×</button></div>",
+      "css": ".ds-input-wrap { position: relative; width: 320px; } .ds-input-search { width: 100%; padding: 10px 34px 10px 14px; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; color: #e0e0e0; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; outline: none; transition: border-color 0.15s; } .ds-input-search:focus { border-color: #666; } .ds-input-clear { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; background: none; border: none; color: #555; font-size: 15px; cursor: pointer; line-height: 1; } .ds-input-clear:hover { color: #aaa; }"
+    },
+    {
+      "name": "Connect (Chain-find) Input",
+      "kind": "input",
+      "refersTo": "input-connect",
+      "description": "Sibling to the primary search, distinguished by amber-family border. Used to specify the second artist when tracing a chain.",
+      "html": "<input class=\"ds-input-connect\" type=\"text\" placeholder=\"Find connection from Radiohead…\" />",
+      "css": ".ds-input-connect { width: 320px; padding: 10px 34px 10px 14px; background: #1a1a1a; border: 1px solid #3a2e18; border-radius: 8px; color: #e0e0e0; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; outline: none; transition: border-color 0.15s; } .ds-input-connect:focus { border-color: #6a5228; } .ds-input-connect::placeholder { color: #5a4820; }"
+    },
+    {
+      "name": "Lifted Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "The signature surface. Header always visible, body slides up on hover. Used for both the artist detail-panel and the landing disclaimer-popup.",
+      "html": "<div class=\"ds-panel\"><div class=\"ds-panel-header\"><div class=\"ds-panel-title\">Rex Explorer</div></div><div class=\"ds-panel-body\"><div class=\"ds-panel-body-inner\"><p>Search any artist to see their similar artists as a force-directed graph.</p></div></div></div>",
+      "css": ".ds-panel { width: 600px; background: #161616; border: 1px solid #2e2e2e; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6); font-family: -apple-system, BlinkMacSystemFont, sans-serif; } .ds-panel-header { padding: 14px 16px; border-bottom: 1px solid transparent; transition: border-color 0.25s; } .ds-panel:hover .ds-panel-header { border-bottom-color: #2a2a2a; } .ds-panel-title { font-size: 22px; font-weight: 300; letter-spacing: 0.1em; color: #d0d0d0; text-transform: uppercase; line-height: 1.2; text-shadow: 0 0 24px #0d0d0d, 0 0 48px #0d0d0d; } .ds-panel-body { max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1); } .ds-panel:hover .ds-panel-body { max-height: 240px; } .ds-panel-body-inner { padding: 12px 16px 16px; } .ds-panel-body p { font-size: 13px; line-height: 1.65; color: #aaa; margin: 0; }"
+    },
+    {
+      "name": "Tag Chip",
+      "kind": "chip",
+      "refersTo": "chip-tag",
+      "description": "Genre / mood label in the detail panel. Display-only, no interaction.",
+      "html": "<span class=\"ds-chip-tag\">classic rock</span>",
+      "css": ".ds-chip-tag { display: inline-block; background: #252525; border: 1px solid #383838; border-radius: 4px; padding: 3px 9px; font-size: 11.5px; color: #c8c8c8; letter-spacing: 0.02em; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }"
+    },
+    {
+      "name": "Control Button",
+      "kind": "button",
+      "refersTo": "control-button",
+      "description": "Bottom-right cluster: zoom in, zoom out, center on root. Visible only when a graph is active.",
+      "html": "<button class=\"ds-control-btn\" data-tooltip=\"Zoom in\">+</button>",
+      "css": ".ds-control-btn { width: 36px; height: 36px; background: #1a1a1a; border: 1px solid #333; border-radius: 6px; color: #ccc; font-size: 18px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background 0.1s, color 0.1s; position: relative; font-family: inherit; } .ds-control-btn:hover { background: #262626; color: #fff; } .ds-control-btn:active { background: #333; } .ds-control-btn::after { content: attr(data-tooltip); position: absolute; right: calc(100% + 10px); top: 50%; transform: translateY(-50%); background: #e8e8e8; color: #111; font-size: 13px; font-weight: 500; white-space: nowrap; padding: 5px 10px; border-radius: 5px; pointer-events: none; opacity: 0; transition: opacity 0.15s; } .ds-control-btn:hover::after { opacity: 1; }"
+    },
+    {
+      "name": "Clear Chain Button (accent showcase)",
+      "kind": "button",
+      "refersTo": "control-button",
+      "description": "The single secondary action that earns the Faded Vinyl Red accent on hover. Destructive intent justifies the color.",
+      "html": "<button class=\"ds-clear-chain\">Clear chain</button>",
+      "css": ".ds-clear-chain { padding: 5px 10px; background: none; border: 1px solid #333; border-radius: 6px; color: #888; font-size: 12px; cursor: pointer; white-space: nowrap; transition: color 0.1s, border-color 0.1s; font-family: inherit; } .ds-clear-chain:hover { color: #e05a54; border-color: #e05a54; }"
+    },
+    {
+      "name": "External Link",
+      "kind": "custom",
+      "refersTo": "link-external",
+      "description": "The Last.fm escape hatch. The arrow is part of the label, not a separate icon.",
+      "html": "<a class=\"ds-link-external\" href=\"#\">View on Last.fm →</a>",
+      "css": ".ds-link-external { font-size: 12px; font-weight: 500; color: #e05a54; text-decoration: none; letter-spacing: 0.01em; font-family: -apple-system, BlinkMacSystemFont, sans-serif; } .ds-link-external:hover { color: #f07a74; text-decoration: underline; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Late Library",
+    "overview": "rex-explorer is a card catalog you wander after hours. The graph is the protagonist, and every visible surface around it is the room that holds the catalog: dim, warm in feel if not in temperature, the brass lamp on the desk and nothing else lit. The user is alone, headphones on, no one else awake. The interface volunteers nothing it does not have to. Discovery is the reward; the chrome refuses to compete with it. The system explicitly rejects four houses: SaaS dashboard, Spotify clone, AI demo aesthetic, Web 2.0 social.",
+    "keyCharacteristics": [
+      "Dark surfaces that absorb attention instead of reflecting it.",
+      "Tinted neutrals carrying ~95% of the pixels; one accent (Faded Vinyl Red) under 5%.",
+      "A single elevated surface (the detail-panel / landing-popup) carries shadow; everything else is flat.",
+      "Type does the heavy lifting. Hierarchy through scale and weight, not color.",
+      "Hover-driven progressive disclosure (slide-up bodies) with non-hover fallbacks for voice / keyboard access."
+    ],
+    "rules": [
+      { "name": "The One Voice Rule", "body": "Faded Vinyl Red appears on under 5% of any screen, ever. It signals destructive intent or external handoff and nothing else.", "section": "colors" },
+      { "name": "The Tinted Neutral Rule", "body": "Every black and white in this system is tinted toward warmth. No #000 outside background base; no decorative pure white.", "section": "colors" },
+      { "name": "The Amber Border Rule", "body": "Amber-family borders are reserved for the chain-find input and any future trace-a-path affordance. Not decoration.", "section": "colors" },
+      { "name": "The Two-Display-Surfaces Rule", "body": "Display type appears in exactly two places: the landing search panel and the landing-popup header.", "section": "typography" },
+      { "name": "The Quiet-Bio Rule", "body": "Bio prose at 13px / 1.65 — looser than body, smaller than body. Looseness invites reading; smaller size keeps it subordinate.", "section": "typography" },
+      { "name": "The One-Elevation Rule", "body": "One shadow value, two surfaces. New floating elements either reuse the exact value or stay flat with a 1px border.", "section": "elevation" },
+      { "name": "The No-Glow Rule", "body": "The accent never carries a glow, halo, or blur. Faded Vinyl Red is flat ink on flat paper.", "section": "elevation" },
+      { "name": "The Two-Inputs-One-Shape Rule", "body": "Search and connect share radius and padding. They differ only in border family. No third input radius.", "section": "components" },
+      { "name": "The Slide-Up Signature", "body": "The lifted panel's header-always / body-on-hover slide is the signature interaction. New panel-shaped components inherit it.", "section": "components" }
+    ],
+    "dos": [
+      "Do keep Faded Vinyl Red (#e05a54) under 5% of any screen. Reserve for destructive actions and external handoffs.",
+      "Do use the system font stack across every level. Hierarchy comes from weight and scale, not font selection.",
+      "Do keep the lifted-panel shadow at exactly 0 8px 32px rgba(0, 0, 0, 0.6).",
+      "Do pair every hover-only reveal with a non-hover path: keyboard focus, tap-to-toggle, or persistent state.",
+      "Do tint every neutral toward warmth.",
+      "Do use the slide-up panel pattern (max-height 0 → 240px, 0.35s cubic-bezier(0.4, 0, 0.2, 1)) for new panel-shaped components.",
+      "Do keep the graph itself shadowless.",
+      "Do carry text-shadow on the display wordmark so it reads cleanly over the background animated graph at landing."
+    ],
+    "donts": [
+      "Don't build SaaS dashboard patterns. No card grids, no hero-metric templates, no blue-default chrome.",
+      "Don't mimic Spotify. No green accent, no album-art rails, no Made for You.",
+      "Don't ship the AI demo aesthetic. No gradient text, no glassmorphism, no neon-on-black.",
+      "Don't import Web 2.0 social patterns. No likes, follower counts, comments, share buttons, trending.",
+      "Don't use side-stripe borders greater than 1px as a colored accent.",
+      "Don't introduce a second elevation tier.",
+      "Don't add a glow or halo to the accent.",
+      "Don't use em dashes in copy.",
+      "Don't introduce a third input radius.",
+      "Don't widen the panel border beyond 1px.",
+      "Don't scale display type beyond its two existing surfaces.",
+      "Don't reach for a modal as the first thought."
+    ]
+  }
+}
