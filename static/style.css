@@ -298,10 +298,11 @@ body.graph-active #search-tagline {
   cursor: default;
 }
 
-#detail-close {
+#detail-close,
+#detail-help,
+#landing-help {
   position: absolute;
   top: 8px;
-  right: 8px;
   z-index: 2;
   width: 36px;
   height: 36px;
@@ -318,7 +319,77 @@ body.graph-active #search-tagline {
   opacity: 0.7;
   transition: opacity 0.15s;
 }
-#detail-close:hover { opacity: 1; }
+#detail-close { right: 8px; }
+#detail-help,
+#landing-help { left: 8px; font-size: 15px; font-weight: 500; }
+#detail-close:hover,
+#detail-help:hover,
+#landing-help:hover { opacity: 1; }
+
+/* Help views sit flat on their panel surfaces — no second elevation */
+#detail-help-inner,
+#landing-help-inner {
+  padding: 44px 20px 20px;
+}
+
+.help-section {
+  margin-bottom: 18px;
+}
+.help-section:last-child { margin-bottom: 0; }
+
+.help-label {
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 10px;
+}
+
+.help-keys {
+  display: grid;
+  grid-template-columns: minmax(96px, max-content) 1fr;
+  column-gap: 16px;
+  row-gap: 8px;
+  align-items: center;
+}
+
+.help-keys dt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.help-keys dd {
+  font-size: 13px;
+  color: #c8c8c8;
+  line-height: 1.4;
+}
+
+#detail-help-view kbd,
+#landing-help-view kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 2px 7px;
+  background: #252525;
+  border: 1px solid #383838;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  color: #d0d0d0;
+  text-align: center;
+  line-height: 1.4;
+}
+
+#detail-help-view p,
+#landing-help-view p {
+  font-size: 13px;
+  line-height: 1.65;
+  color: #aaa;
+  margin-bottom: 8px;
+}
+#detail-help-view p:last-child,
+#landing-help-view p:last-child { margin-bottom: 0; }
 
 /* Hero image header */
 #detail-hero {
@@ -525,6 +596,8 @@ a:focus-visible {
   outline-offset: 2px;
 }
 #detail-close:focus-visible,
+#detail-help:focus-visible,
+#landing-help:focus-visible,
 #detail-center:focus-visible {
   outline-color: rgba(255, 255, 255, 0.5);
 }
@@ -551,7 +624,7 @@ body.graph-active #landing-popup {
 }
 
 #landing-popup-header {
-  padding: 14px 16px 14px;
+  padding: 14px 16px 14px 56px;
   border-bottom: 1px solid #2a2a2a;
 }
 
