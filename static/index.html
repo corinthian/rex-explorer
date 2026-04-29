@@ -28,10 +28,26 @@
       <div id="connect-spacer" hidden></div>
       <button id="clear-chain" hidden>Clear chain</button>
     </div>
+    <div id="search-status">
+      <div class="status-inputs">
+        <div id="search-idler" aria-hidden="true" hidden>
+          <div class="wave">
+            <span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+        <div id="search-error" role="status" hidden>
+          <span class="status-glyph" aria-hidden="true">!</span>
+          <span class="status-text">No results for that artist. Try another name.</span>
+        </div>
+      </div>
+      <div class="status-tail"></div>
+    </div>
     <div id="connect-hint" hidden>Search a second artist to trace the path between them.</div>
     <div id="connect-error" hidden></div>
     <div id="search-tagline">Explore the world around any artist</div>
-    <div id="search-error" hidden>No results for that artist. Try another name.</div>
   </div>
 
   <div id="bg-graph"></div>
@@ -126,8 +142,6 @@
       </div>
     </div>
   </div>
-
-  <div id="loading" hidden>Loading…</div>
 
   <script src="https://unpkg.com/force-graph@1.43.5/dist/force-graph.min.js"></script>
   <script type="module" src="app.js"></script>

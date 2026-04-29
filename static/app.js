@@ -396,17 +396,17 @@ loadBgGraph();
 
 // ------------------------------------------------------------------ loading
 
-const loadingEl = document.getElementById("loading");
+const idlerEl = document.getElementById("search-idler");
 let loadingCount = 0;
 
 function startLoading() {
   loadingCount++;
-  loadingEl.hidden = false;
+  idlerEl.hidden = false;
 }
 
 function stopLoading() {
   loadingCount = Math.max(0, loadingCount - 1);
-  if (loadingCount === 0) loadingEl.hidden = true;
+  if (loadingCount === 0) idlerEl.hidden = true;
 }
 
 // ------------------------------------------------------------------ detail panel
@@ -1025,6 +1025,7 @@ let addRootVersion = 0;
 
 async function addRootArtist(name) {
   const myVersion = ++addRootVersion;
+  searchError.hidden = true;
   startLoading();
   try {
     const [infoRes, simRes] = await Promise.all([
@@ -1064,6 +1065,10 @@ async function addRootArtist(name) {
     console.error("addRootArtist failed:", e);
   } finally {
     stopLoading();
+    if (myVersion === addRootVersion && searchInput.value === name) {
+      searchInput.value = "";
+      searchClear.classList.remove("visible");
+    }
   }
 }
 
