@@ -14,14 +14,16 @@
     </div>
     <div id="search-row">
       <div id="search-input-wrap">
-        <input id="search-input" type="text" placeholder="Search for an artist…" autocomplete="off" spellcheck="false">
+        <input id="search-input" type="text" placeholder="Search for an artist…" autocomplete="off" spellcheck="false"
+               role="combobox" aria-controls="search-results" aria-expanded="false" aria-autocomplete="list" aria-label="Search for an artist">
         <button id="search-clear" aria-label="Clear search">×</button>
-        <ul id="search-results" hidden></ul>
+        <ul id="search-results" role="listbox" aria-label="Search results" hidden></ul>
       </div>
       <div id="connect-wrap" hidden>
-        <input id="connect-input" type="text" placeholder="Find connection from…" autocomplete="off" spellcheck="false">
+        <input id="connect-input" type="text" placeholder="Find connection from…" autocomplete="off" spellcheck="false"
+               role="combobox" aria-controls="connect-results" aria-expanded="false" aria-autocomplete="list" aria-label="Find connection to artist">
         <button id="connect-clear" aria-label="Clear">×</button>
-        <ul id="connect-results" hidden></ul>
+        <ul id="connect-results" role="listbox" aria-label="Connection candidates" hidden></ul>
       </div>
       <div id="connect-spacer" hidden></div>
       <button id="clear-chain" hidden>Clear chain</button>

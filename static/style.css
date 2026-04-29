@@ -105,14 +105,14 @@ body.graph-active #search-landing {
 }
 #search-input:focus { border-color: #666; }
 
-/* Clear button */
+/* Clear button — hit target expanded to 32×32 for voice/dictation use */
 #search-clear {
   position: absolute;
-  right: 10px;
+  right: 4px;
   top: 50%;
   transform: translateY(-50%);
-  width: 18px;
-  height: 18px;
+  width: 32px;
+  height: 32px;
   background: none;
   border: none;
   color: #555;
@@ -125,7 +125,8 @@ body.graph-active #search-landing {
   line-height: 1;
 }
 #search-clear.visible { display: flex; }
-#search-clear:hover { color: #aaa; }
+#search-clear:hover,
+#search-clear:focus-visible { color: #aaa; outline: none; }
 
 #search-results {
   position: absolute;
@@ -149,7 +150,8 @@ body.graph-active #search-landing {
   align-items: center;
   gap: 8px;
 }
-#search-results li:hover { background: #262626; }
+#search-results li:hover,
+#search-results li.highlighted { background: #262626; }
 #search-results .result-name { font-weight: 500; }
 #search-results .result-listeners {
   font-size: 11px;
@@ -184,10 +186,11 @@ body.graph-active #search-landing {
 
 #connect-clear {
   position: absolute;
-  right: 10px;
-  top: 10px;
-  width: 18px;
-  height: 18px;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
   background: none;
   border: none;
   color: #555;
@@ -200,7 +203,8 @@ body.graph-active #search-landing {
   line-height: 1;
 }
 #connect-clear.visible { display: flex; }
-#connect-clear:hover { color: #aaa; }
+#connect-clear:hover,
+#connect-clear:focus-visible { color: #aaa; outline: none; }
 
 #connect-results {
   position: absolute;
@@ -224,7 +228,8 @@ body.graph-active #search-landing {
   align-items: center;
   gap: 8px;
 }
-#connect-results li:hover { background: #262216; }
+#connect-results li:hover,
+#connect-results li.highlighted { background: #262216; }
 
 #connect-hint {
   font-size: 11px;
@@ -295,8 +300,8 @@ body.graph-active #search-tagline {
   top: 8px;
   right: 8px;
   z-index: 2;
-  width: 26px;
-  height: 26px;
+  width: 36px;
+  height: 36px;
   background: rgba(0,0,0,0.5);
   border: none;
   border-radius: 50%;

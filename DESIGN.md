@@ -198,7 +198,7 @@ The two inputs (primary search, connect / chain-find) share shape and differ onl
 - **Primary search:** Drawer background, Wire border. Focus shifts the border to `#666` — a quiet pop, no glow, no shadow.
 - **Connect search:** Drawer background, Amber Trace border (`#3a2e18`). Focus shifts the border to `#6a5228`. Placeholder is `#5a4820`. The amber is functional differentiation, not theming.
 - **Padding:** `10px 34px 10px 14px` — the right padding reserves space for the inline clear (×) button.
-- **Clear button:** absolute-positioned (×), Spine Gray, becomes Quiet Gray on hover. No background, no border.
+- **Clear button:** absolute-positioned (×), Spine Gray, becomes Quiet Gray on hover. No background, no border. Hit zone is 32×32 with the 15px glyph centered, so a dictation user can reach it without precise pointer work.
 - **Result dropdown:** flush continuation of the input — same width, no top border, bottom corners 8px. Items are 8px / 14px padded rows, name on left, listener count (Caption / Spine Gray) on right. Hover row is Hover Wash.
 
 ### Lifted Panels (detail-panel, landing-popup)
@@ -208,7 +208,7 @@ The signature surface of the system. Both share frame, position, and shadow; the
 - **Header:** quiet, always visible. Holds the title (Display for landing-popup, Headline + listener count for detail-panel) and any always-visible status. Bottom border is transparent at rest, becomes Row Rule on panel hover — a subtle hint that more is below.
 - **Body:** hidden at rest (`max-height: 0`), reveals on panel hover via a 0.35s `cubic-bezier(0.4, 0, 0.2, 1)` max-height transition. Reveals up to ~200–240px. The slide is the panel's signature gesture.
 - **Inner padding:** 12px top / 16px sides / 16px bottom.
-- **Close button:** 26×26 circle, semi-transparent Hall background, fades from 0.7 to 1.0 opacity on hover. Top-right, 8px inset. Used on the detail-panel only; the landing-popup is auto-dismissed by graph activation, no close.
+- **Close button:** 36×36 circle (sized for voice/dictation reach), semi-transparent Hall background, fades from 0.7 to 1.0 opacity on hover. Top-right, 8px inset. Used on the detail-panel only; the landing-popup is auto-dismissed by graph activation, no close.
 
 ### Tag Chips
 Genre / mood labels in the detail panel.
