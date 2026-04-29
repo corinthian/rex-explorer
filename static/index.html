@@ -38,25 +38,49 @@
   <div id="graph"></div>
 
   <div id="detail-panel" hidden>
+    <button id="detail-help" aria-label="Help" aria-expanded="false">?</button>
     <button id="detail-close" aria-label="Close">×</button>
-    <div id="detail-hero">
-      <img id="detail-img" alt="" hidden>
-      <div id="detail-hero-bg"></div>
-      <div id="detail-hero-text">
-        <div id="detail-hero-text-left">
-          <div id="detail-name"></div>
-          <div id="detail-listeners"></div>
+    <div id="detail-artist-view">
+      <div id="detail-hero">
+        <img id="detail-img" alt="" hidden>
+        <div id="detail-hero-bg"></div>
+        <div id="detail-hero-text">
+          <div id="detail-hero-text-left">
+            <div id="detail-name"></div>
+            <div id="detail-listeners"></div>
+          </div>
+          <button id="detail-center">⌖</button>
         </div>
-        <button id="detail-center">⌖</button>
+      </div>
+      <div id="detail-tags-row">
+        <div id="detail-tags"></div>
+      </div>
+      <div id="detail-body">
+        <div id="detail-body-inner">
+          <div id="detail-bio"></div>
+          <a id="detail-link" target="_blank" rel="noopener">View on Last.fm →</a>
+        </div>
       </div>
     </div>
-    <div id="detail-tags-row">
-      <div id="detail-tags"></div>
-    </div>
-    <div id="detail-body">
-      <div id="detail-body-inner">
-        <div id="detail-bio"></div>
-        <a id="detail-link" target="_blank" rel="noopener">View on Last.fm →</a>
+    <div id="detail-help-view" hidden>
+      <div id="detail-help-inner">
+        <div class="help-section">
+          <div class="help-label">Shortcuts</div>
+          <dl class="help-keys">
+            <dt><kbd>/</kbd></dt><dd>Focus search</dd>
+            <dt><kbd>Esc</kbd></dt><dd>Close this panel</dd>
+            <dt><kbd>+</kbd> <kbd>=</kbd></dt><dd>Zoom in</dd>
+            <dt><kbd>−</kbd> <kbd>_</kbd></dt><dd>Zoom out</dd>
+            <dt><kbd>0</kbd></dt><dd>Center on root artist</dd>
+            <dt><kbd>Tab</kbd></dt><dd>Cycle focusable elements</dd>
+          </dl>
+        </div>
+        <div class="help-section">
+          <div class="help-label">Usage</div>
+          <p>Click any node to expand its similar artists. Click an expanded node again to collapse it back to a leaf.</p>
+          <p>Drag empty space to pan, scroll to zoom. Click the ⌖ button to recenter on the root artist.</p>
+          <p>Once a root is set, the amber input traces a chain between the root and a second artist through the similarity network.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -68,13 +92,37 @@
   </div>
 
   <div id="landing-popup">
-    <div id="landing-popup-header">
-      <div id="landing-popup-title">About</div>
+    <button id="landing-help" aria-label="Help" aria-expanded="false">?</button>
+    <div id="landing-about-view">
+      <div id="landing-popup-header">
+        <div id="landing-popup-title">About</div>
+      </div>
+      <div id="landing-popup-body">
+        <div id="landing-popup-body-inner">
+          <p>Search any artist to see their similar artists as a force-directed graph. Click any node to expand its neighbors, or trace a chain between two artists through Last.fm's similarity network.</p>
+          <p>An unofficial graphical frontend for <a href="https://www.last.fm" target="_blank" rel="noopener">Last.fm</a>. Not affiliated with or endorsed by Last.fm.</p>
+        </div>
+      </div>
     </div>
-    <div id="landing-popup-body">
-      <div id="landing-popup-body-inner">
-        <p>Search any artist to see their similar artists as a force-directed graph. Click any node to expand its neighbors, or trace a chain between two artists through Last.fm's similarity network.</p>
-        <p>An unofficial graphical frontend for <a href="https://www.last.fm" target="_blank" rel="noopener">Last.fm</a>. Not affiliated with or endorsed by Last.fm.</p>
+    <div id="landing-help-view" hidden>
+      <div id="landing-help-inner">
+        <div class="help-section">
+          <div class="help-label">Shortcuts</div>
+          <dl class="help-keys">
+            <dt><kbd>/</kbd></dt><dd>Focus search</dd>
+            <dt><kbd>Esc</kbd></dt><dd>Close detail panel</dd>
+            <dt><kbd>+</kbd> <kbd>=</kbd></dt><dd>Zoom in</dd>
+            <dt><kbd>−</kbd> <kbd>_</kbd></dt><dd>Zoom out</dd>
+            <dt><kbd>0</kbd></dt><dd>Center on root artist</dd>
+            <dt><kbd>Tab</kbd></dt><dd>Cycle focusable elements</dd>
+          </dl>
+        </div>
+        <div class="help-section">
+          <div class="help-label">Usage</div>
+          <p>Pick an artist from the search box to seed the graph. Click any node to expand its similar artists. Click an expanded node again to collapse it back to a leaf.</p>
+          <p>Drag empty space to pan, scroll to zoom. Click the ⌖ button to recenter on the root artist.</p>
+          <p>Once a root is set, the amber input traces a chain between the root and a second artist through the similarity network.</p>
+        </div>
       </div>
     </div>
   </div>

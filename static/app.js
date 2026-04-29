@@ -419,8 +419,41 @@ const detailTags = document.getElementById("detail-tags");
 const detailBio = document.getElementById("detail-bio");
 const detailLink = document.getElementById("detail-link");
 
+const detailArtistView = document.getElementById("detail-artist-view");
+const detailHelpView = document.getElementById("detail-help-view");
+const detailHelpBtn = document.getElementById("detail-help");
+
 document.getElementById("detail-close").addEventListener("click", () => {
   detailPanel.hidden = true;
+  setHelpOpen(false);
+});
+
+function setHelpOpen(open) {
+  detailHelpView.hidden = !open;
+  detailArtistView.hidden = open;
+  detailHelpBtn.textContent = open ? "←" : "?";
+  detailHelpBtn.setAttribute("aria-label", open ? "Back" : "Help");
+  detailHelpBtn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+detailHelpBtn.addEventListener("click", () => {
+  setHelpOpen(detailHelpView.hidden);
+});
+
+const landingAboutView = document.getElementById("landing-about-view");
+const landingHelpView = document.getElementById("landing-help-view");
+const landingHelpBtn = document.getElementById("landing-help");
+
+function setLandingHelpOpen(open) {
+  landingHelpView.hidden = !open;
+  landingAboutView.hidden = open;
+  landingHelpBtn.textContent = open ? "←" : "?";
+  landingHelpBtn.setAttribute("aria-label", open ? "Back" : "Help");
+  landingHelpBtn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+landingHelpBtn.addEventListener("click", () => {
+  setLandingHelpOpen(landingHelpView.hidden);
 });
 
 document.getElementById("detail-center").addEventListener("click", () => {
@@ -434,6 +467,7 @@ document.getElementById("detail-center").addEventListener("click", () => {
 
 async function showDetail(name) {
   detailPanel.hidden = false;
+  setHelpOpen(false);
   detailName.textContent = name;
   detailListeners.textContent = "";
   detailTags.innerHTML = "";
@@ -860,7 +894,17 @@ document.addEventListener("keydown", e => {
   const inInput = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
 
   if (e.key === "Escape" && !inInput && !detailPanel.hidden) {
-    detailPanel.hidden = true;
+    if (!detailHelpView.hidden) {
+      setHelpOpen(false);
+    } else {
+      detailPanel.hidden = true;
+    }
+    e.preventDefault();
+    return;
+  }
+
+  if (e.key === "Escape" && !inInput && !landingHelpView.hidden) {
+    setLandingHelpOpen(false);
     e.preventDefault();
     return;
   }
