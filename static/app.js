@@ -58,6 +58,28 @@ const detailCache = new Map(); // name -> artist info
 let rootNodeName = null;   // name of the first/current root artist
 const chainLinkKeys = new Set(); // sorted link keys currently part of the chain
 
+// ------------------------------------------------------------------ motion preference
+
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ------------------------------------------------------------------ per-node loading
+
+let loadingNodeCount = 0;
+
+function beginNodeLoading(node) {
+  if (node.loading) return;
+  node.loading = true;
+  loadingNodeCount++;
+  if (loadingNodeCount === 1) Graph.d3AlphaTarget(0.1);
+}
+
+function endNodeLoading(node) {
+  if (!node.loading) return;
+  node.loading = false;
+  loadingNodeCount = Math.max(0, loadingNodeCount - 1);
+  if (loadingNodeCount === 0) Graph.d3AlphaTarget(0);
+}
+
 // ------------------------------------------------------------------ pointer tracking
 
 let pointerGraphCoords = null;
@@ -117,6 +139,18 @@ const Graph = ForceGraph()(graphEl)
     }
 
     ctx.restore();
+
+    // loading pulse ring
+    if (node.loading) {
+      const alpha = reducedMotion
+        ? 0.5
+        : 0.25 + 0.45 * (0.5 + 0.5 * Math.sin((performance.now() / 600) * Math.PI));
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r + 5, 0, 2 * Math.PI);
+      ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
 
     // ring for expanded nodes
     if (node.expanded) {
@@ -457,6 +491,7 @@ async function handleNodeClick(node) {
 
   node.expanded = true;
   node.abortController = new AbortController();
+  beginNodeLoading(node);
   startLoading();
 
   try {
@@ -478,6 +513,7 @@ async function handleNodeClick(node) {
     if (e.name === 'AbortError') return;
     console.error("expand failed:", e);
   } finally {
+    endNodeLoading(node);
     if (node.abortController) node.abortController = null;
     stopLoading();
   }
