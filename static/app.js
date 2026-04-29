@@ -801,8 +801,8 @@ connectInput.addEventListener("input", () => {
       }
       if (!Array.isArray(data) || !data.length) { hideResults(connectResults); return; }
       renderResultItems(connectResults, data, name => {
-        connectInput.value = "";
-        connectClear.classList.remove("visible");
+        connectInput.value = name;
+        connectClear.classList.add("visible");
         hideResults(connectResults);
         addChainTo(name);
       });
@@ -952,7 +952,11 @@ function clearChain() {
   refreshGraph();
 }
 
-clearChainBtn.addEventListener("click", clearChain);
+clearChainBtn.addEventListener("click", () => {
+  clearChain();
+  connectInput.value = "";
+  connectClear.classList.remove("visible");
+});
 
 async function addChainTo(targetName) {
   startLoading();
@@ -965,6 +969,8 @@ async function addChainTo(targetName) {
     if (!res.ok || data.error) {
       connectError.textContent = data.error || "no chain found";
       connectError.hidden = false;
+      connectInput.value = "";
+      connectClear.classList.remove("visible");
       return;
     }
 
