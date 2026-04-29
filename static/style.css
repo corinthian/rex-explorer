@@ -530,6 +530,17 @@ body.graph-active #search-tagline {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
 
+/* Focus-visible rings for keyboard / dictation users */
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #888;
+  outline-offset: 2px;
+}
+#detail-close:focus-visible,
+#detail-center:focus-visible {
+  outline-color: rgba(255, 255, 255, 0.5);
+}
+
 /* Landing popup — disclaimer, mirrors detail-panel framing + hover slide-up */
 #landing-popup {
   position: absolute;

@@ -787,12 +787,55 @@ document.getElementById("btn-zoom-out").addEventListener("click", () => {
   Graph.zoom(Graph.zoom() / ZOOM_STEP, ZOOM_DURATION);
 });
 
-document.getElementById("btn-center").addEventListener("click", () => {
+document.getElementById("btn-center").addEventListener("click", centerOnRoot);
+
+function centerOnRoot() {
   if (!rootNodeName) return;
   const root = nodes.get(rootNodeName);
   if (!root || root.x == null) return;
   Graph.centerAt(root.x, root.y, 600);
   Graph.zoom(2.5, 600);
+}
+
+// ------------------------------------------------------------------ global keyboard shortcuts
+
+document.addEventListener("keydown", e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.target;
+  const inInput = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
+
+  if (e.key === "Escape" && !inInput && !detailPanel.hidden) {
+    detailPanel.hidden = true;
+    e.preventDefault();
+    return;
+  }
+
+  if (inInput) return;
+
+  switch (e.key) {
+    case "/":
+      e.preventDefault();
+      searchInput.focus();
+      searchInput.select();
+      break;
+    case "+":
+    case "=":
+      if (!document.body.classList.contains("graph-active")) return;
+      e.preventDefault();
+      Graph.zoom(Graph.zoom() * ZOOM_STEP, ZOOM_DURATION);
+      break;
+    case "-":
+    case "_":
+      if (!document.body.classList.contains("graph-active")) return;
+      e.preventDefault();
+      Graph.zoom(Graph.zoom() / ZOOM_STEP, ZOOM_DURATION);
+      break;
+    case "0":
+      if (!document.body.classList.contains("graph-active")) return;
+      e.preventDefault();
+      centerOnRoot();
+      break;
+  }
 });
 
 // ------------------------------------------------------------------ root artist
