@@ -20,7 +20,6 @@
       "text-tag": { "role": "neutral", "displayName": "Tag Text", "canonical": "oklch(82% 0 0)" },
       "text-muted": { "role": "neutral", "displayName": "Quiet Gray", "canonical": "oklch(72% 0 0)" },
       "text-secondary": { "role": "neutral", "displayName": "Index Gray", "canonical": "oklch(60% 0 0)" },
-      "text-faint": { "role": "neutral", "displayName": "Spine Gray", "canonical": "oklch(35% 0 0)" },
       "accent-vinyl-red": { "role": "primary", "displayName": "Faded Vinyl Red", "canonical": "oklch(63% 0.16 22)" },
       "accent-vinyl-red-hover": { "role": "primary", "displayName": "Faded Vinyl Red (hover)", "canonical": "oklch(70% 0.16 22)" },
       "amber-border": { "role": "secondary", "displayName": "Amber Trace", "canonical": "oklch(28% 0.04 70)" },

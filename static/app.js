@@ -720,7 +720,7 @@ function renderSearchResults(results) {
   }
   if (!results.length) {
     hideResults(searchResults);
-    searchError.textContent = "No results for that artist — try another name";
+    searchError.textContent = "No results for that artist. Try another name.";
     searchError.hidden = false;
     return;
   }
