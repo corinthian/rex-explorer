@@ -111,7 +111,7 @@ The system explicitly rejects four houses. It is not a SaaS dashboard (no card g
 - Tinted neutrals carrying ~95% of the pixels; one accent (Faded Vinyl Red) under 5%.
 - A single elevated surface (the detail-panel / landing-popup) carries shadow; everything else is flat.
 - Type does the heavy lifting. Hierarchy through scale and weight, not color.
-- Hover-driven progressive disclosure (slide-up bodies) with non-hover fallbacks for voice / keyboard access.
+- Persistent-open lifted panels — body content stays visible by default so voice / dictation users can read it without hovering.
 
 ## 2. Colors
 
@@ -205,8 +205,8 @@ The two inputs (primary search, connect / chain-find) share shape and differ onl
 The signature surface of the system. Both share frame, position, and shadow; they differ in interior structure.
 
 - **Frame:** 600px wide, 12px corner radius, Catalog Card background, 1px Hairline Steel border, Lifted Panel shadow. Pinned to bottom-left at 18px / 18px.
-- **Header:** quiet, always visible. Holds the title (Display for landing-popup, Headline + listener count for detail-panel) and any always-visible status. Bottom border is transparent at rest, becomes Row Rule on panel hover — a subtle hint that more is below.
-- **Body:** hidden at rest (`max-height: 0`), reveals on panel hover via a 0.35s `cubic-bezier(0.4, 0, 0.2, 1)` max-height transition. Reveals up to ~200–240px. The slide is the panel's signature gesture.
+- **Header:** holds the title (Display for landing-popup, Headline + listener count for detail-panel) and any always-visible status. A persistent 1px Row Rule divider sits below it, separating header from body.
+- **Body:** persistent-open by default. Bio prose, links, and disclaimer copy are always visible — no hover-to-reveal gesture. The doctrine change is deliberate: voice and dictation users cannot hover, and the panel's job is to keep information available.
 - **Inner padding:** 12px top / 16px sides / 16px bottom.
 - **Close button:** 36×36 circle (sized for voice/dictation reach), semi-transparent Hall background, fades from 0.7 to 1.0 opacity on hover. Top-right, 8px inset. Used on the detail-panel only; the landing-popup is auto-dismissed by graph activation, no close.
 
@@ -247,7 +247,7 @@ Top-right pill. Drawer background, Wire border, 6px radius, Index Gray text at 1
 
 **The Two-Inputs-One-Shape Rule.** Search and connect share radius, padding, and shape. They differ only in border family (Wire vs. Amber Trace). New inputs must inherit this shape; do not introduce a third radius for inputs.
 
-**The Slide-Up Signature.** The lifted panel's header-always / body-on-hover slide is the system's signature interaction. New panel-shaped components (artist comparison, history, settings) should adopt this pattern unless they have a strong reason not to. The slide pattern is what makes the system feel like it.
+**The Persistent-Open Rule.** Lifted panels show their full content by default. Body never collapses on rest. Voice and dictation users cannot reach hover-only content, and the panel's job is to keep information available, not to hide it behind a gesture. New panel-shaped components inherit this pattern.
 
 ## 6. Do's and Don'ts
 
@@ -257,7 +257,7 @@ Top-right pill. Drawer background, Wire border, 6px radius, Index Gray text at 1
 - **Do** keep the lifted-panel shadow at exactly `0 8px 32px rgba(0, 0, 0, 0.6)`. New panels reuse this value or stay flat.
 - **Do** pair every hover-only reveal with a non-hover path: keyboard focus, tap-to-toggle, or persistent state. The primary user dictates input — hover-only is inaccessible.
 - **Do** tint every neutral toward warmth. The room is dim and lamp-lit, not industrial.
-- **Do** use the slide-up panel pattern (max-height 0 → 240px, 0.35s `cubic-bezier(0.4, 0, 0.2, 1)`) for new panel-shaped components.
+- **Do** keep lifted panels persistent-open. Header and body are both visible at rest; body content does not collapse.
 - **Do** keep the graph itself shadowless. Force-directed nodes float on the base plane.
 - **Do** carry text-shadow on the display wordmark (`0 0 24px #0d0d0d, 0 0 48px #0d0d0d`) so it reads cleanly over the background animated graph at landing.
 
