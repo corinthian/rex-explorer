@@ -46,6 +46,35 @@ _no_chain_cache: dict = {}  # frozenset({a_lc, b_lc}) -> timestamp
 _NO_CHAIN_TTL = 86400  # 24 h
 
 
+def _rank_search_results(query: str, results: list[dict], top: int = 10) -> list[dict]:
+    """Re-rank Last.fm artistmatches: prefer exact/prefix match, then listener count.
+
+    Last.fm's native order weights name-token similarity heavily, surfacing
+    obscure Unicode/capitalization variants above legitimate matches. This
+    rebalances toward the popular, on-prefix artist while keeping query
+    relevance dominant over raw popularity.
+    """
+    import math
+    q_lc = query.lower().strip()
+
+    def score(item):
+        name = item.get("name", "")
+        n_lc = name.lower()
+        listeners = max(int(item.get("listeners", 0)), 1)
+        if n_lc == q_lc:
+            factor = 1.5
+        elif n_lc.startswith(q_lc):
+            factor = 1.0
+        elif q_lc in n_lc:
+            factor = 0.6
+        else:
+            factor = 0.2
+        return factor * math.log10(listeners)
+
+    ranked = sorted(results, key=score, reverse=True)
+    return ranked[:top]
+
+
 def get_client() -> LastFM:
     global _client
     if _client is None:
@@ -142,8 +171,8 @@ class Handler(BaseHTTPRequestHandler):
         if not q:
             return self._error("missing q", 400)
         try:
-            results = get_client().artist_search(q, limit=10)
-            self._json(results)
+            raw = get_client().artist_search(q, limit=30)
+            self._json(_rank_search_results(q, raw, top=10))
         except LastFMError as e:
             self._error(str(e))
 
