@@ -18,7 +18,6 @@ colors:
   text-tag: "#c8c8c8"
   text-muted: "#aaaaaa"
   text-secondary: "#888888"
-  text-faint: "#444444"
   accent-vinyl-red: "#e05a54"
   accent-vinyl-red-hover: "#f07a74"
   amber-border: "#3a2e18"
@@ -138,8 +137,7 @@ A single-accent palette: warm-tinted near-black neutrals with one muted coral-re
 - **Display White** (`#d0d0d0`): the wide-tracked uppercase display ("REX EXPLORER") at landing and in the disclaimer popup. Slightly receded by design — the title is a sign on the wall, not a logo.
 - **Tag Text** (`#c8c8c8`): genre chip labels.
 - **Quiet Gray** (`#aaaaaa`): bio prose in the slide-up body.
-- **Index Gray** (`#888888`): hints, secondary buttons, the "Find connection from…" hint.
-- **Spine Gray** (`#444444`): the tagline ("Explore the world around any artist") at landing. Almost a watermark.
+- **Index Gray** (`#888888`): hints, secondary buttons, the "Find connection from…" hint, the tagline ("Explore the world around any artist") at landing.
 
 ### Path-Find Accent (functional, not decorative)
 - **Amber Trace** (`#3a2e18` border, `#6a5228` focus, `#5a4820` placeholder): the chain-find input uses an amber-family border family to distinguish "I am looking for a path" from "I am searching the catalog". This is functional differentiation, not palette expansion. Treat it as a sibling to the primary search input, not a new role.
