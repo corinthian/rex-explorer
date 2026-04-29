@@ -689,11 +689,13 @@ const connectClear = document.getElementById("connect-clear");
 const connectResults = document.getElementById("connect-results");
 const connectHint = document.getElementById("connect-hint");
 const connectSpacer = document.getElementById("connect-spacer");
+const connectError = document.getElementById("connect-error");
 let connectTimer = null;
 let connectVersion = 0;
 
 connectInput.addEventListener("input", () => {
   connectClear.classList.toggle("visible", connectInput.value.length > 0);
+  connectError.hidden = true;
   clearTimeout(connectTimer);
   const q = connectInput.value.trim();
   if (!q) { hideResults(connectResults); return; }
@@ -706,8 +708,8 @@ connectInput.addEventListener("input", () => {
       if (connectInput.value.trim() !== q) return;
       if (!res.ok || (data && data.error)) {
         hideResults(connectResults);
-        searchError.textContent = (data && data.error) || "Search failed";
-        searchError.hidden = false;
+        connectError.textContent = (data && data.error) || "Search failed";
+        connectError.hidden = false;
         return;
       }
       if (!Array.isArray(data) || !data.length) { hideResults(connectResults); return; }
@@ -857,14 +859,15 @@ clearChainBtn.addEventListener("click", clearChain);
 
 async function addChainTo(targetName) {
   startLoading();
+  connectError.hidden = true;
   try {
     const res = await fetch(
       `/api/chain?from=${encodeURIComponent(rootNodeName)}&to=${encodeURIComponent(targetName)}`
     );
     const data = await res.json();
     if (!res.ok || data.error) {
-      searchError.textContent = data.error || "no chain found";
-      searchError.hidden = false;
+      connectError.textContent = data.error || "no chain found";
+      connectError.hidden = false;
       return;
     }
 
