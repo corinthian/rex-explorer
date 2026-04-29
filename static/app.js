@@ -65,19 +65,36 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matc
 // ------------------------------------------------------------------ per-node loading
 
 let loadingNodeCount = 0;
+let pulseRafHandle = null;
+let lastPulseReheat = 0;
+
+function pulseLoop() {
+  if (loadingNodeCount === 0) {
+    pulseRafHandle = null;
+    return;
+  }
+  const now = performance.now();
+  if (now - lastPulseReheat > 500) {
+    Graph.d3ReheatSimulation();
+    lastPulseReheat = now;
+  }
+  pulseRafHandle = requestAnimationFrame(pulseLoop);
+}
 
 function beginNodeLoading(node) {
   if (node.loading) return;
   node.loading = true;
   loadingNodeCount++;
-  if (loadingNodeCount === 1) Graph.d3AlphaTarget(0.1);
+  if (pulseRafHandle === null) {
+    lastPulseReheat = 0;
+    pulseRafHandle = requestAnimationFrame(pulseLoop);
+  }
 }
 
 function endNodeLoading(node) {
   if (!node.loading) return;
   node.loading = false;
   loadingNodeCount = Math.max(0, loadingNodeCount - 1);
-  if (loadingNodeCount === 0) Graph.d3AlphaTarget(0);
 }
 
 // ------------------------------------------------------------------ pointer tracking
