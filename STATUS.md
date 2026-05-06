@@ -38,4 +38,12 @@ Tracks findings from the 2026-05-06 code review.
 - [x] **Skip Last.fm calls for short queries** — both search and connect inputs hold fire until the query is ≥ 3 characters. Saves rate-limit budget on the keystrokes that almost never produce useful matches. (`static/search.js`, commit `5ff6197`)
 - [x] **Search input shows current root** — `addRootArtist` no longer clears the search input on completion; the input now serves as the persistent current-root display, updated by `handleNodeClick` when the user re-roots. (`static/chain.js`, commit `2ce252d`)
 - [x] **Pin closest node within repulsion radius** — the pointer-repulsion force engages at 55 graph units, but pinning was 24, so dense clusters scattered when the pointer approached. Now the closest node within the same 55-unit radius gets pinned; it freezes for the click while peers flow out of the way to disambiguate. (`static/graph.js`, commit `f2d984c`)
-- [~] **Stable nodes array for force-graph rebinds** — attempted in `591873a`, reverted in `f9b3148`: force-graph's Kapsule layer short-circuits on `===` reference equality of `data.nodes`, so newly pushed nodes never bound and the tree could disappear after rapid expansion. The spread was the right answer all along.
+
+## Reverted / failed attempts
+
+- [~] **Stable nodes array for force-graph rebinds** — attempted in `591873a`, reverted in `f9b3148`. Force-graph's Kapsule layer short-circuits on `===` reference equality of `data.nodes`, so newly pushed nodes never bound and the tree could disappear after rapid expansion. The spread was the right answer all along.
+
+## Deferred / won't fix
+
+- **`refreshGraph` allocates fresh arrays on every call** — required by force-graph; passing the same array reference suppresses node binding (see reverted attempt above). Real wins live inside force-graph itself, not in our code.
+- **`app.js` further modular split** — current 8-module layout is coherent. No further breakup planned.
