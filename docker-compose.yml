@@ -1,0 +1,26 @@
+services:
+  rex-explorer:
+    build:
+      context: .
+      platforms:
+        - linux/amd64
+    image: rex-explorer:amd64
+    platform: linux/amd64
+    container_name: rex
+    ports:
+      - "8787:8787"
+    volumes:
+      - ${HOME}/.config/rex/config.json:/root/.config/rex/config.json:ro
+      - rex-cache:/root/.cache/rex
+    environment:
+      - LASTFM_API_KEY=${LASTFM_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8787/', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  rex-cache:
