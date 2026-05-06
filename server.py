@@ -87,7 +87,13 @@ def get_client() -> LastFM:
 
 
 def _wikipedia_thumbnail(slug: str) -> str | None:
-    """Fetch Wikipedia page summary and return image URL, or None."""
+    """Fetch Wikipedia page summary and return image URL, or None.
+
+    Returns the REST summary `thumbnail` (capped ~320px) rather than
+    `originalimage`, which can be multi-MB. Node portraits and the
+    detail-panel hero both render under 600px; the original source
+    wastes bandwidth and stalls first paint.
+    """
     try:
         url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(slug)}"
         req = urllib.request.Request(url, headers={"User-Agent": "rex-musicrec/1.0"})
@@ -98,11 +104,7 @@ def _wikipedia_thumbnail(slug: str) -> str | None:
         # Skip disambiguation pages — they have no useful image
         if data.get("type") == "disambiguation":
             return None
-        thumb = data.get("thumbnail", {}).get("source")
-        if not thumb:
-            return None
-        original = data.get("originalimage", {}).get("source")
-        return original or thumb
+        return data.get("thumbnail", {}).get("source") or None
     except Exception:
         return None
 
