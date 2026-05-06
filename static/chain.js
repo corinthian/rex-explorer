@@ -180,6 +180,14 @@ export async function addRootArtist(name) {
     connectHint.hidden = false;
     connectSpacer.hidden = false;
 
+    // Keep the seed name visible in the search input as the current-root
+    // display. Subsequent click-to-change-root in handleNodeClick replaces
+    // it with the newly clicked artist.
+    if (myVersion === addRootVersion) {
+      searchInput.value = canonName;
+      searchClear.classList.add("visible");
+    }
+
     refreshGraph();
     document.getElementById("controls").classList.add("controls-visible");
     setTimeout(() => {
@@ -190,9 +198,5 @@ export async function addRootArtist(name) {
     console.error("addRootArtist failed:", e);
   } finally {
     stopLoading();
-    if (myVersion === addRootVersion && searchInput.value === name) {
-      searchInput.value = "";
-      searchClear.classList.remove("visible");
-    }
   }
 }
