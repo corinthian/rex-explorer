@@ -37,7 +37,5 @@ Tracks findings from the 2026-05-06 code review.
 
 - [x] **Skip Last.fm calls for short queries** — both search and connect inputs hold fire until the query is ≥ 3 characters. Saves rate-limit budget on the keystrokes that almost never produce useful matches. (`static/search.js`, commit `5ff6197`)
 - [x] **Search input shows current root** — `addRootArtist` no longer clears the search input on completion; the input now serves as the persistent current-root display, updated by `handleNodeClick` when the user re-roots. (`static/chain.js`, commit `2ce252d`)
-
-## Deferred
-
-- **`refreshGraph` full-array rebuild** — fine at current graph sizes. Revisit if a future feature pushes node counts higher.
+- [x] **Stable nodes array for force-graph rebinds** — parallel `nodesArr` mirrors the `nodes` Map; `refreshGraph` passes the array reference directly so each call skips the Map → Array spread. (`static/state.js` + `static/graph.js`, commit `591873a`)
+- [x] **Pin closest node within repulsion radius** — the pointer-repulsion force engages at 55 graph units, but pinning was 24, so dense clusters scattered when the pointer approached. Now the closest node within the same 55-unit radius gets pinned; it freezes for the click while peers flow out of the way to disambiguate. (`static/graph.js`, commit `f2d984c`)
