@@ -620,7 +620,8 @@ function collapseNode(node) {
     if (pinnedNode && pinnedNode.name === name) unpinCurrent();
     nodes.delete(name);
     detailCache.delete(name);
-    imageCache.delete(name);
+    // Keep imageCache: a re-expansion of the same artist would otherwise
+    // pay another /api/image round-trip for an already-resolved portrait.
   }
   const removeLinks = links.filter(l => {
     const a = l.source?.id ?? l.source;
