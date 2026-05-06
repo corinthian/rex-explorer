@@ -2,6 +2,7 @@
 
 import json
 import logging
+import math
 import mimetypes
 import os
 import sys
@@ -91,7 +92,6 @@ def _rank_search_results(query: str, results: list[dict], top: int = 10) -> list
     rebalances toward the popular, on-prefix artist while keeping query
     relevance dominant over raw popularity.
     """
-    import math
     q_lc = query.lower().strip()
 
     def score(item):

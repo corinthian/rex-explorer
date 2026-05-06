@@ -157,7 +157,9 @@ class LastFM:
             "artist": artist, "limit": limit, "autocorrect": 1
         })
         artists = data.get("similarartists", {}).get("artist", [])
-        return [{"name": a["name"], "match": float(a["match"])} for a in artists]
+        # Last.fm occasionally returns "" for match on weak similars; treat as 0.
+        return [{"name": a["name"], "match": float(a.get("match") or 0)}
+                for a in artists]
 
     def artist_search(self, query: str, limit: int = 10) -> list[dict]:
         """Returns list of {name, listeners} matching query."""

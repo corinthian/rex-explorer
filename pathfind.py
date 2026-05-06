@@ -101,6 +101,9 @@ def _find_chain_once(lastfm: LastFM, from_name: str, to_name: str,
         return None
 
     def integrate(u, d, similar, dist, other_dist, heap):
+        # Runs single-threaded after the worker pool resolves; the shared
+        # canon / pair_match / dist / heap structures need no locking
+        # despite the threaded similar_artists fetches above.
         nonlocal best, best_mid
         for sim in similar:
             v = lc(sim["name"])
