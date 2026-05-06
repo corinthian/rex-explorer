@@ -5,10 +5,12 @@ import logging
 import mimetypes
 import os
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import Future
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -42,6 +44,8 @@ def _load_api_key() -> str:
 
 _client: LastFM | None = None
 _image_cache: dict = {}  # artist name -> image URL or None
+_image_cache_lock = threading.Lock()
+_image_inflight: dict = {}  # artist name -> Future[str | None]
 _no_chain_cache: dict = {}  # frozenset({a_lc, b_lc}) -> timestamp
 _NO_CHAIN_TTL = 86400  # 24 h
 
@@ -218,11 +222,32 @@ class Handler(BaseHTTPRequestHandler):
         name = params.get("name", "").strip()
         if not name:
             return self._error("missing name", 400)
-        if name in _image_cache:
-            return self._json({"url": _image_cache[name]})
 
-        url = _fetch_image_url(name)
-        _image_cache[name] = url
+        with _image_cache_lock:
+            if name in _image_cache:
+                return self._json({"url": _image_cache[name]})
+            fut = _image_inflight.get(name)
+            if fut is None:
+                fut = Future()
+                _image_inflight[name] = fut
+                owner = True
+            else:
+                owner = False
+
+        if owner:
+            try:
+                url = _fetch_image_url(name)
+            except Exception as e:
+                with _image_cache_lock:
+                    _image_inflight.pop(name, None)
+                fut.set_exception(e)
+                raise
+            with _image_cache_lock:
+                _image_cache[name] = url
+                _image_inflight.pop(name, None)
+            fut.set_result(url)
+        else:
+            url = fut.result()
         self._json({"url": url})
 
     def _serve_favicon(self):
