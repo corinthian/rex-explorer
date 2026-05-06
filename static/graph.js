@@ -152,9 +152,10 @@ Graph.d3Force('link').distance(120);
 
 // ----------------------------------------------------- pointer repulsion force
 
+const PINNING_RADIUS = 55;  // graph-coord radius for both pinning and repulsion
+
 Graph.d3Force('pointer-repulsion', alpha => {
   if (!pointerGraphCoords) return;
-  const RADIUS = 55;
   const STRENGTH = 0.7;
   const { x: px, y: py } = pointerGraphCoords;
 
@@ -164,44 +165,37 @@ Graph.d3Force('pointer-repulsion', alpha => {
     const dx = node.x - px;
     const dy = node.y - py;
     const dist2 = dx * dx + dy * dy;
-    if (dist2 < RADIUS * RADIUS && dist2 > 0.01) {
+    if (dist2 < PINNING_RADIUS * PINNING_RADIUS && dist2 > 0.01) {
       const dist = Math.sqrt(dist2);
-      const force = STRENGTH * alpha * (1 - dist / RADIUS);
+      const force = STRENGTH * alpha * (1 - dist / PINNING_RADIUS);
       node.vx = (node.vx || 0) + (dx / dist) * force;
       node.vy = (node.vy || 0) + (dy / dist) * force;
     }
   }
 });
 
-const HIT_RADIUS = 24;
-
 graphEl.addEventListener('mousemove', e => {
   const rect = graphEl.getBoundingClientRect();
   pointerGraphCoords = Graph.screen2GraphCoords(e.clientX - rect.left, e.clientY - rect.top);
   const { x: px, y: py } = pointerGraphCoords;
 
+  // Pin the closest node within PINNING_RADIUS so it never flees the cursor.
+  // Other nodes inside the same radius still feel the repulsion force, which
+  // helps disambiguate clusters; the pinned target stays put for clicking.
   let hit = null;
+  let bestDist2 = PINNING_RADIUS * PINNING_RADIUS;
   for (const node of nodes.values()) {
     if (node.x == null || node.y == null) continue;
     const dx = node.x - px;
     const dy = node.y - py;
-    if (dx * dx + dy * dy < HIT_RADIUS * HIT_RADIUS) { hit = node; break; }
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestDist2) { bestDist2 = d2; hit = node; }
   }
 
   if (hit) {
     pinNode(hit);
   } else {
     unpinCurrent();
-    const TRIGGER_RADIUS = 55;
-    for (const node of nodes.values()) {
-      if (node.x == null || node.y == null) continue;
-      const dx = node.x - px;
-      const dy = node.y - py;
-      if (dx * dx + dy * dy < TRIGGER_RADIUS * TRIGGER_RADIUS) {
-        Graph.d3ReheatSimulation();
-        break;
-      }
-    }
   }
 });
 
