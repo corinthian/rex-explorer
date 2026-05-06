@@ -20,6 +20,11 @@ let searchVersion = 0;
 let connectTimer = null;
 let connectVersion = 0;
 
+// Skip /api/search for very short queries — one or two characters
+// almost never surface a useful Last.fm match and just burn rate-limit
+// budget. The dropdown stays empty until the user reaches MIN_SEARCH_LEN.
+const MIN_SEARCH_LEN = 3;
+
 // ---------------------------------------------------------- dropdown helpers
 
 function inputForList(listEl) {
@@ -90,7 +95,7 @@ searchInput.addEventListener("input", () => {
   searchError.hidden = true;
   clearTimeout(searchTimer);
   const q = searchInput.value.trim();
-  if (!q) { hideResults(searchResults); return; }
+  if (q.length < MIN_SEARCH_LEN) { hideResults(searchResults); return; }
   searchTimer = setTimeout(() => doSearch(q), 300);
 });
 
@@ -171,7 +176,7 @@ connectInput.addEventListener("input", () => {
   connectError.hidden = true;
   clearTimeout(connectTimer);
   const q = connectInput.value.trim();
-  if (!q) { hideResults(connectResults); return; }
+  if (q.length < MIN_SEARCH_LEN) { hideResults(connectResults); return; }
   connectTimer = setTimeout(async () => {
     const myVersion = ++connectVersion;
     try {
