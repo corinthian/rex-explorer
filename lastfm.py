@@ -63,7 +63,9 @@ class LastFM:
 
     def _cache_put(self, path: Path, data: dict) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"fetched": time.time(), "data": data}))
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps({"fetched": time.time(), "data": data}))
+        os.replace(tmp, path)
 
     # --------------------------------------------------------------- http
 
