@@ -3,7 +3,11 @@
 // other modules being loaded; everything in here is consumed by graph.js,
 // detail.js, chain.js, and search.js.
 
+// nodes (Map for O(1) lookup) and nodesArr (stable array for force-graph)
+// must stay in sync. Mutate them only through addNode/collapseNode in
+// graph.js; never push or splice nodesArr from elsewhere.
 export const nodes = new Map();        // name -> node object
+export const nodesArr = [];            // same node objects, stable array reference
 export const links = [];               // {source, target, match, chain?}
 export const linkKeys = new Set();     // canonical "a|||b" keys mirroring `links`
 export const chainLinkKeys = new Set();// keys currently part of the rendered chain

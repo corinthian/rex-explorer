@@ -5,7 +5,7 @@
 
 import { hashColor, initials, linkKey } from "./utils.js";
 import {
-  nodes, links, linkKeys, chainLinkKeys, detailCache, imageCache,
+  nodes, nodesArr, links, linkKeys, chainLinkKeys, detailCache, imageCache,
   getImage, loadImage, getRoot, reducedMotion,
   startLoading, stopLoading,
 } from "./state.js";
@@ -152,9 +152,10 @@ Graph.d3Force('link').distance(120);
 
 // ----------------------------------------------------- pointer repulsion force
 
+const PINNING_RADIUS = 55;  // graph-coord radius for both pinning and repulsion
+
 Graph.d3Force('pointer-repulsion', alpha => {
   if (!pointerGraphCoords) return;
-  const RADIUS = 55;
   const STRENGTH = 0.7;
   const { x: px, y: py } = pointerGraphCoords;
 
@@ -164,44 +165,37 @@ Graph.d3Force('pointer-repulsion', alpha => {
     const dx = node.x - px;
     const dy = node.y - py;
     const dist2 = dx * dx + dy * dy;
-    if (dist2 < RADIUS * RADIUS && dist2 > 0.01) {
+    if (dist2 < PINNING_RADIUS * PINNING_RADIUS && dist2 > 0.01) {
       const dist = Math.sqrt(dist2);
-      const force = STRENGTH * alpha * (1 - dist / RADIUS);
+      const force = STRENGTH * alpha * (1 - dist / PINNING_RADIUS);
       node.vx = (node.vx || 0) + (dx / dist) * force;
       node.vy = (node.vy || 0) + (dy / dist) * force;
     }
   }
 });
 
-const HIT_RADIUS = 24;
-
 graphEl.addEventListener('mousemove', e => {
   const rect = graphEl.getBoundingClientRect();
   pointerGraphCoords = Graph.screen2GraphCoords(e.clientX - rect.left, e.clientY - rect.top);
   const { x: px, y: py } = pointerGraphCoords;
 
+  // Pin the closest node within PINNING_RADIUS so it never flees the cursor.
+  // Other nodes inside the same radius still feel the repulsion force, which
+  // helps disambiguate clusters; the pinned target stays put for clicking.
   let hit = null;
+  let bestDist2 = PINNING_RADIUS * PINNING_RADIUS;
   for (const node of nodes.values()) {
     if (node.x == null || node.y == null) continue;
     const dx = node.x - px;
     const dy = node.y - py;
-    if (dx * dx + dy * dy < HIT_RADIUS * HIT_RADIUS) { hit = node; break; }
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestDist2) { bestDist2 = d2; hit = node; }
   }
 
   if (hit) {
     pinNode(hit);
   } else {
     unpinCurrent();
-    const TRIGGER_RADIUS = 55;
-    for (const node of nodes.values()) {
-      if (node.x == null || node.y == null) continue;
-      const dx = node.x - px;
-      const dy = node.y - py;
-      if (dx * dx + dy * dy < TRIGGER_RADIUS * TRIGGER_RADIUS) {
-        Graph.d3ReheatSimulation();
-        break;
-      }
-    }
   }
 });
 
@@ -224,6 +218,7 @@ export function addNode(name, color, inits, tags = []) {
   if (nodes.has(name)) return nodes.get(name);
   const node = { id: name, name, color, initials: inits, tags, expanded: false };
   nodes.set(name, node);
+  nodesArr.push(node);
   loadImage(name);
   return node;
 }
@@ -236,10 +231,7 @@ export function addLink(sourceName, targetName, match) {
 }
 
 export function refreshGraph() {
-  Graph.graphData({
-    nodes: [...nodes.values()],
-    links: [...links],
-  });
+  Graph.graphData({ nodes: nodesArr, links });
 }
 
 export function reheat() {
@@ -311,8 +303,11 @@ export function collapseNode(node) {
   }
 
   for (const name of toRemove) {
-    if (isPinned(nodes.get(name))) unpinCurrent();
+    const child = nodes.get(name);
+    if (isPinned(child)) unpinCurrent();
     nodes.delete(name);
+    const idx = nodesArr.indexOf(child);
+    if (idx !== -1) nodesArr.splice(idx, 1);
     detailCache.delete(name);
     // Keep imageCache: a re-expansion of the same artist would otherwise
     // pay another /api/image round-trip for an already-resolved portrait.
