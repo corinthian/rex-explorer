@@ -5,7 +5,7 @@
 
 import { hashColor, initials, linkKey } from "./utils.js";
 import {
-  nodes, links, linkKeys, chainLinkKeys, detailCache, imageCache,
+  nodes, nodesArr, links, linkKeys, chainLinkKeys, detailCache, imageCache,
   getImage, loadImage, getRoot, reducedMotion,
   startLoading, stopLoading,
 } from "./state.js";
@@ -224,6 +224,7 @@ export function addNode(name, color, inits, tags = []) {
   if (nodes.has(name)) return nodes.get(name);
   const node = { id: name, name, color, initials: inits, tags, expanded: false };
   nodes.set(name, node);
+  nodesArr.push(node);
   loadImage(name);
   return node;
 }
@@ -236,10 +237,7 @@ export function addLink(sourceName, targetName, match) {
 }
 
 export function refreshGraph() {
-  Graph.graphData({
-    nodes: [...nodes.values()],
-    links: [...links],
-  });
+  Graph.graphData({ nodes: nodesArr, links });
 }
 
 export function reheat() {
@@ -311,8 +309,11 @@ export function collapseNode(node) {
   }
 
   for (const name of toRemove) {
-    if (isPinned(nodes.get(name))) unpinCurrent();
+    const child = nodes.get(name);
+    if (isPinned(child)) unpinCurrent();
     nodes.delete(name);
+    const idx = nodesArr.indexOf(child);
+    if (idx !== -1) nodesArr.splice(idx, 1);
     detailCache.delete(name);
     // Keep imageCache: a re-expansion of the same artist would otherwise
     // pay another /api/image round-trip for an already-resolved portrait.
