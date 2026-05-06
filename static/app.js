@@ -423,9 +423,19 @@ const detailArtistView = document.getElementById("detail-artist-view");
 const detailHelpView = document.getElementById("detail-help-view");
 const detailHelpBtn = document.getElementById("detail-help");
 
+let detailImagePoll = null;
+
+function clearDetailImagePoll() {
+  if (detailImagePoll !== null) {
+    clearInterval(detailImagePoll);
+    detailImagePoll = null;
+  }
+}
+
 document.getElementById("detail-close").addEventListener("click", () => {
   detailPanel.hidden = true;
   setHelpOpen(false);
+  clearDetailImagePoll();
 });
 
 function setHelpOpen(open) {
@@ -466,6 +476,7 @@ document.getElementById("detail-center").addEventListener("click", () => {
 });
 
 async function showDetail(name) {
+  clearDetailImagePoll();
   detailPanel.hidden = false;
   setHelpOpen(false);
   detailName.textContent = name;
@@ -483,16 +494,19 @@ async function showDetail(name) {
     detailImg.hidden = false;
   } else if (cachedImg === 'loading' || !imageCache.has(name)) {
     // Wait for it — re-render when it arrives
-    const checkInterval = setInterval(() => {
+    detailImagePoll = setInterval(() => {
+      // Bail if panel closed or name changed under us
+      if (detailPanel.hidden || detailName.textContent !== name) {
+        clearDetailImagePoll();
+        return;
+      }
       const img = imageCache.get(name);
       if (img && img !== 'loading') {
-        clearInterval(checkInterval);
-        if (!detailPanel.hidden && detailName.textContent === name) {
-          detailImg.src = img.src;
-          detailImg.hidden = false;
-        }
+        clearDetailImagePoll();
+        detailImg.src = img.src;
+        detailImg.hidden = false;
       } else if (img === null) {
-        clearInterval(checkInterval);
+        clearDetailImagePoll();
       }
     }, 200);
   }
@@ -898,6 +912,7 @@ document.addEventListener("keydown", e => {
       setHelpOpen(false);
     } else {
       detailPanel.hidden = true;
+      clearDetailImagePoll();
     }
     e.preventDefault();
     return;
