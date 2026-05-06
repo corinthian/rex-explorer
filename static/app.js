@@ -54,9 +54,14 @@ function loadImage(name) {
 
 const nodes = new Map();   // name -> node object
 const links = [];          // {source, target, match}
+const linkKeys = new Set(); // canonical "a|||b" keys mirroring `links` for O(1) dedup
 const detailCache = new Map(); // name -> artist info
 let rootNodeName = null;   // name of the first/current root artist
 const chainLinkKeys = new Set(); // sorted link keys currently part of the chain
+
+function linkKey(a, b) {
+  return a < b ? `${a}|||${b}` : `${b}|||${a}`;
+}
 
 // ------------------------------------------------------------------ motion preference
 
@@ -287,12 +292,9 @@ function addNode(name, color, inits, tags = []) {
 }
 
 function addLink(sourceName, targetName, match) {
-  const key = [sourceName, targetName].sort().join("|||");
-  if (links.some(l => {
-    const a = l.source?.id ?? l.source;
-    const b = l.target?.id ?? l.target;
-    return [a, b].sort().join("|||") === key;
-  })) return;
+  const key = linkKey(sourceName, targetName);
+  if (linkKeys.has(key)) return;
+  linkKeys.add(key);
   links.push({ source: sourceName, target: targetName, match: match || 0 });
 }
 
@@ -625,7 +627,13 @@ function collapseNode(node) {
     const b = l.target?.id ?? l.target;
     return toRemove.has(a) || toRemove.has(b);
   });
-  for (const l of removeLinks) links.splice(links.indexOf(l), 1);
+  for (const l of removeLinks) {
+    const a = l.source?.id ?? l.source;
+    const b = l.target?.id ?? l.target;
+    linkKeys.delete(linkKey(a, b));
+    chainLinkKeys.delete(linkKey(a, b));
+    links.splice(links.indexOf(l), 1);
+  }
 
   node.expanded = false;
   refreshGraph();
@@ -973,14 +981,20 @@ clearChainBtn.addEventListener("click", () => {
   connectClear.classList.remove("visible");
 });
 
+let addChainVersion = 0;
+
 async function addChainTo(targetName) {
+  const myVersion = ++addChainVersion;
+  const myRoot = rootNodeName;
   startLoading();
   connectError.hidden = true;
   try {
     const res = await fetch(
-      `/api/chain?from=${encodeURIComponent(rootNodeName)}&to=${encodeURIComponent(targetName)}`
+      `/api/chain?from=${encodeURIComponent(myRoot)}&to=${encodeURIComponent(targetName)}`
     );
     const data = await res.json();
+    // Bail if a newer chain request started or the root changed under us
+    if (myVersion !== addChainVersion || rootNodeName !== myRoot) return;
     if (!res.ok || data.error) {
       connectError.textContent = data.error || "no chain found";
       connectError.hidden = false;
@@ -993,7 +1007,7 @@ async function addChainTo(targetName) {
     clearChain();
 
     // Capture endpoint positions before adding new nodes
-    const rootNode = nodes.get(rootNodeName);
+    const rootNode = nodes.get(myRoot);
     const existingTarget = nodes.get(targetName);
     const rx = rootNode?.x ?? 0;
     const ry = rootNode?.y ?? 0;
@@ -1017,14 +1031,14 @@ async function addChainTo(targetName) {
       const b = path[i + 1].name;
       const match = path[i].match_to_next || 0;
       addLink(a, b, match);
-      newKeys.add([a, b].sort().join("|||"));
+      newKeys.add(linkKey(a, b));
     }
 
     // Tag link objects as chain
     for (const l of links) {
       const la = l.source?.id ?? l.source;
       const lb = l.target?.id ?? l.target;
-      const key = [la, lb].sort().join("|||");
+      const key = linkKey(la, lb);
       if (newKeys.has(key)) {
         l.chain = true;
         chainLinkKeys.add(key);
@@ -1036,6 +1050,7 @@ async function addChainTo(targetName) {
     reheat();
     setTimeout(() => Graph.zoomToFit(600, 60), 800);
   } catch (e) {
+    if (myVersion !== addChainVersion) return;
     console.error("addChainTo failed:", e);
   } finally {
     stopLoading();
