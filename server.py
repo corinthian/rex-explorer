@@ -35,7 +35,10 @@ def _load_api_key() -> str:
             if cfg.get("api_key"):
                 return cfg["api_key"]
         except Exception:
-            pass
+            logging.exception(
+                "failed to read Last.fm config at %s; falling back to "
+                "'no key found' error", CONFIG_PATH,
+            )
     raise RuntimeError(
         "No Last.fm API key found. Set LASTFM_API_KEY env var or run "
         "'python3 -m rex setup' in the recommender project."
@@ -47,7 +50,37 @@ _image_cache: dict = {}  # artist name -> image URL or None
 _image_cache_lock = threading.Lock()
 _image_inflight: dict = {}  # artist name -> Future[str | None]
 _no_chain_cache: dict = {}  # frozenset({a_lc, b_lc}) -> timestamp
+_no_chain_cache_lock = threading.Lock()
 _NO_CHAIN_TTL = 86400  # 24 h
+_NO_CHAIN_MAX = 1000   # cap entries; oldest evicted when exceeded
+
+
+def _no_chain_record(key: frozenset) -> None:
+    """Record a no-path result; sweep expired and cap size under a lock."""
+    now = time.time()
+    with _no_chain_cache_lock:
+        # Drop expired entries opportunistically
+        expired = [k for k, ts in _no_chain_cache.items()
+                   if now - ts >= _NO_CHAIN_TTL]
+        for k in expired:
+            _no_chain_cache.pop(k, None)
+        _no_chain_cache[key] = now
+        # Hard cap: evict oldest insertion-order entries until under limit
+        while len(_no_chain_cache) > _NO_CHAIN_MAX:
+            oldest = next(iter(_no_chain_cache))
+            _no_chain_cache.pop(oldest, None)
+
+
+def _no_chain_check(key: frozenset) -> bool:
+    """Return True if a fresh no-path entry exists for this pair."""
+    with _no_chain_cache_lock:
+        ts = _no_chain_cache.get(key)
+        if ts is None:
+            return False
+        if time.time() - ts >= _NO_CHAIN_TTL:
+            _no_chain_cache.pop(key, None)
+            return False
+        return True
 
 
 def _rank_search_results(query: str, results: list[dict], top: int = 10) -> list[dict]:
@@ -208,13 +241,12 @@ class Handler(BaseHTTPRequestHandler):
         if not a or not b:
             return self._error("missing from or to", 400)
         cache_key = frozenset((a.lower(), b.lower()))
-        cached_at = _no_chain_cache.get(cache_key)
-        if cached_at is not None and time.time() - cached_at < _NO_CHAIN_TTL:
+        if _no_chain_check(cache_key):
             return self._json({"error": "No path found — these artists may not be connected in Last.fm's similarity graph."})
         try:
             result = find_chain(get_client(), a, b)
             if result is None:
-                _no_chain_cache[cache_key] = time.time()
+                _no_chain_record(cache_key)
                 return self._json({"error": "No path found — these artists may not be connected in Last.fm's similarity graph."})
             self._json(result)
         except LastFMError as e:

@@ -1,8 +1,10 @@
 """Last.fm API client with file-based caching and rate limiting."""
 
 import hashlib
+import html
 import json
 import os
+import re
 import threading
 import time
 from concurrent.futures import Future
@@ -10,6 +12,9 @@ from pathlib import Path
 
 import requests
 from requests.adapters import HTTPAdapter
+
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"\s+")
 
 BASE_URL = "https://ws.audioscrobbler.com/2.0/"
 CACHE_TTL = 7 * 24 * 3600  # 7 days
@@ -42,6 +47,11 @@ class LastFM:
         self._session.mount("https://", adapter)
 
         self.stats = {"cache_hit": 0, "dedup_hit": 0, "network": 0}
+        self._stats_lock = threading.Lock()
+
+    def _bump(self, key: str) -> None:
+        with self._stats_lock:
+            self.stats[key] += 1
 
     # ------------------------------------------------------------------ cache
 
@@ -77,7 +87,7 @@ class LastFM:
 
         cached = self._cache_get(cache_path)
         if cached is not None:
-            self.stats["cache_hit"] += 1
+            self._bump("cache_hit")
             return cached
 
         inflight_key = method + json.dumps(sorted(cache_key_params.items()))
@@ -92,7 +102,7 @@ class LastFM:
                 owner = False
 
         if not owner:
-            self.stats["dedup_hit"] += 1
+            self._bump("dedup_hit")
             return fut.result()  # blocks; re-raises on failure
 
         try:
@@ -129,7 +139,7 @@ class LastFM:
 
             if data:
                 self._cache_put(cache_path, data)
-            self.stats["network"] += 1
+            self._bump("network")
             fut.set_result(data)
             return data
         except Exception as e:
@@ -160,12 +170,15 @@ class LastFM:
 
     def artist_info(self, artist: str) -> dict:
         """Returns {name, tags, listeners, bio_summary, url} for an artist."""
-        import re
         data = self._request("artist.getInfo", {"artist": artist, "autocorrect": 1})
         info = data.get("artist", {})
         tags = [t["name"].lower() for t in info.get("tags", {}).get("tag", [])]
         bio = info.get("bio", {}).get("summary", "")
-        bio = re.sub(r"<a [^>]+>.*?</a>", "", bio).strip()
+        # Strip every tag, then decode entities, then collapse whitespace.
+        # Last.fm bios contain <a>, occasional <br>, and HTML entities.
+        bio = _HTML_TAG_RE.sub("", bio)
+        bio = html.unescape(bio)
+        bio = _WS_RE.sub(" ", bio).strip()
         return {
             "name": info.get("name", artist),
             "listeners": int(info.get("stats", {}).get("listeners", 0)),
