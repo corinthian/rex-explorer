@@ -139,7 +139,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", len(body))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
@@ -269,8 +268,14 @@ class Handler(BaseHTTPRequestHandler):
     def _serve_static(self, path):
         if path == "/" or path == "":
             path = "/index.html"
-        file_path = STATIC_DIR / path.lstrip("/")
-        if not file_path.exists() or not file_path.is_file():
+        static_root = STATIC_DIR.resolve()
+        try:
+            file_path = (STATIC_DIR / path.lstrip("/")).resolve()
+        except (OSError, RuntimeError):
+            self.send_response(404)
+            self.end_headers()
+            return
+        if not file_path.is_relative_to(static_root) or not file_path.is_file():
             self.send_response(404)
             self.end_headers()
             return
