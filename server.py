@@ -23,7 +23,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 
 PORT = 8787
 STATIC_DIR = Path(__file__).parent / "static"
-CONFIG_PATH = Path.home() / ".config" / "rex" / "config.json"
+CONFIG_PATH = Path(
+    os.environ.get("REX_CONFIG_PATH")
+    or Path.home() / ".config" / "rex" / "config.json"
+)
+CACHE_DIR = Path(
+    os.environ.get("REX_CACHE_DIR")
+    or Path.home() / ".cache" / "rex"
+)
 
 
 def _load_api_key() -> str:
@@ -115,7 +122,7 @@ def _rank_search_results(query: str, results: list[dict], top: int = 10) -> list
 def get_client() -> LastFM:
     global _client
     if _client is None:
-        _client = LastFM(_load_api_key())
+        _client = LastFM(_load_api_key(), cache_dir=CACHE_DIR)
     return _client
 
 
