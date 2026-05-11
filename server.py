@@ -48,8 +48,9 @@ def _load_api_key() -> str:
                 "'no key found' error", CONFIG_PATH,
             )
     raise RuntimeError(
-        "No Last.fm API key found. Set LASTFM_API_KEY env var or run "
-        "'python3 -m rex setup' in the recommender project."
+        f"No Last.fm API key found. Set LASTFM_API_KEY env var, or "
+        f'put {{"api_key": "..."}} at {CONFIG_PATH} '
+        f"(override path with REX_CONFIG_PATH)."
     )
 
 
