@@ -8,7 +8,7 @@ Interactive artist graph visualization using Last.fm data.
 python3 server.py
 ```
 
-Opens at http://localhost:8787. Requires a Last.fm API key in `~/.config/rex/config.json` (shared with the recommender) or `LASTFM_API_KEY` env var.
+Opens at http://localhost:8787. Requires a Last.fm API key in `~/.config/rex/config.json` or `LASTFM_API_KEY` env var. `REX_CONFIG_PATH` / `REX_CACHE_DIR` override the defaults.
 
 ## Structure
 
