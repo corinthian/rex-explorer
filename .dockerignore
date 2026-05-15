@@ -1,4 +1,10 @@
 __pycache__/
+*.pyc
+*.pyo
 .git
 .gitignore
-CLAUDE.md
+*.md
+DESIGN.json
+.DS_Store
+.venv
+venv
