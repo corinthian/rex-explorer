@@ -1,8 +1,8 @@
 # rex-explorer
 
-Visual Last.fm artist similarity explorer. Search an artist, expand the node, and the graph grows outward through related artists. A force-directed canvas, real portraits where they exist, and a chain finder that connects any two artists through their shortest similarity path.
+### → [Try it live at rex.rlarsen.tech](https://rex.rlarsen.tech)
 
-**Live:** [rex.rlarsen.tech](https://rex.rlarsen.tech)
+Visual Last.fm artist similarity explorer. Search an artist, expand the node, and the graph grows outward through related artists. A force-directed canvas, real portraits where they exist, and a chain finder that connects any two artists through their shortest similarity path.
 
 ## What it does
 
