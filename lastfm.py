@@ -3,6 +3,7 @@
 import hashlib
 import html
 import json
+import logging
 import os
 import re
 import threading
@@ -19,6 +20,8 @@ _WS_RE = re.compile(r"\s+")
 BASE_URL = "https://ws.audioscrobbler.com/2.0/"
 CACHE_TTL = 7 * 24 * 3600  # 7 days
 MIN_REQUEST_INTERVAL = 0.2  # 200ms = ~5 req/sec; override via REX_LASTFM_INTERVAL_MS
+
+logger = logging.getLogger(__name__)
 
 
 class LastFMError(Exception):
@@ -118,24 +121,23 @@ class LastFM:
                     BASE_URL, params=params,
                     headers={"User-Agent": "rex-musicrec/1.0"}, timeout=15
                 )
-            except requests.RequestException as e:
-                raise LastFMError(f"network error: {e}") from e
+            except requests.RequestException as exc:
+                logger.warning("Last.fm transport failure: %s",
+                                str(exc).replace(self.api_key, "[api_key]"))
+                raise LastFMError("Last.fm is temporarily unavailable") from exc
             try:
                 data = resp.json()
-            except Exception:
-                try:
-                    resp.raise_for_status()
-                except requests.RequestException as e:
-                    raise LastFMError(f"network error: {e}") from e
-                raise LastFMError(f"HTTP {resp.status_code}: non-JSON response")
+            except ValueError:
+                logger.warning("Last.fm returned non-JSON HTTP %s", resp.status_code)
+                raise LastFMError("Last.fm returned an invalid response")
 
             if "error" in data:
                 if data["error"] == 6:
                     data = {}
                 else:
-                    raise LastFMError(
-                        f"Last.fm error {data['error']}: {data.get('message', '')}"
-                    )
+                    logger.warning("Last.fm upstream error %s: %s",
+                                    data["error"], data.get("message", ""))
+                    raise LastFMError(f"Last.fm error {data['error']}")
 
             if data:
                 self._cache_put(cache_path, data)

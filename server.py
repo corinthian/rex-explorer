@@ -219,7 +219,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             raw = get_client().artist_search(q, limit=30)
             self._json(_rank_search_results(q, raw, top=10))
+        # %s only; the __cause__ chain holds the unredacted upstream URL
         except LastFMError as e:
+            logging.warning("lastfm: %s", e)
             self._error(str(e))
 
     def _handle_artist(self, params):
@@ -229,7 +231,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             info = get_client().artist_info(name)
             self._json(info)
+        # %s only; the __cause__ chain holds the unredacted upstream URL
         except LastFMError as e:
+            logging.warning("lastfm: %s", e)
             self._error(str(e))
 
     def _handle_similar(self, params):
@@ -240,7 +244,9 @@ class Handler(BaseHTTPRequestHandler):
             limit = int(params.get("limit", 5))
             results = get_client().similar_artists(artist, limit=limit)
             self._json(results)
+        # %s only; the __cause__ chain holds the unredacted upstream URL
         except LastFMError as e:
+            logging.warning("lastfm: %s", e)
             self._error(str(e))
 
     def _handle_chain(self, params):
@@ -257,7 +263,9 @@ class Handler(BaseHTTPRequestHandler):
                 _no_chain_record(cache_key)
                 return self._json({"error": "No path found — these artists may not be connected in Last.fm's similarity graph."})
             self._json(result)
+        # %s only; the __cause__ chain holds the unredacted upstream URL
         except LastFMError as e:
+            logging.warning("lastfm: %s", e)
             self._error(str(e))
 
     def _handle_image(self, params):
