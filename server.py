@@ -178,6 +178,8 @@ def _fetch_image_url(name: str) -> str | None:
 
 
 class Handler(BaseHTTPRequestHandler):
+    timeout = 30
+
     def log_message(self, fmt, *args):
         print(f"[{self.address_string()}] {fmt % args}")
 
@@ -242,6 +244,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._error("missing artist", 400)
         try:
             limit = int(params.get("limit", 5))
+        except ValueError:
+            return self._error("invalid limit", 400)
+        limit = max(1, min(limit, 50))
+        try:
             results = get_client().similar_artists(artist, limit=limit)
             self._json(results)
         # %s only; the __cause__ chain holds the unredacted upstream URL
