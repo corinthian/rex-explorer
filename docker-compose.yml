@@ -8,7 +8,7 @@ services:
     platform: linux/amd64
     container_name: rex
     ports:
-      - "8787:8787"
+      - "127.0.0.1:8787:8787"
     volumes:
       - ${HOME}/.config/rex/config.json:/root/.config/rex/config.json:ro
       - rex-cache:/root/.cache/rex

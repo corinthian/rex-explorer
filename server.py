@@ -58,10 +58,21 @@ _client: LastFM | None = None
 _image_cache: dict = {}  # artist name -> image URL or None
 _image_cache_lock = threading.Lock()
 _image_inflight: dict = {}  # artist name -> Future[str | None]
+_IMAGE_CACHE_MAX = 5000  # cap entries; oldest evicted when exceeded
 _no_chain_cache: dict = {}  # frozenset({a_lc, b_lc}) -> timestamp
 _no_chain_cache_lock = threading.Lock()
 _NO_CHAIN_TTL = 86400  # 24 h
 _NO_CHAIN_MAX = 1000   # cap entries; oldest evicted when exceeded
+_chain_slots = threading.BoundedSemaphore(2)  # cap concurrent /api/chain runs
+
+MAX_PARAM_LENGTH = 200
+
+
+def _clean_param(params, key):
+    value = params.get(key, "").strip()
+    if not value or len(value) > MAX_PARAM_LENGTH or any(ord(c) < 32 for c in value):
+        return None
+    return value
 
 
 def _no_chain_record(key: frozenset) -> None:
@@ -178,8 +189,11 @@ def _fetch_image_url(name: str) -> str | None:
 
 
 class Handler(BaseHTTPRequestHandler):
+    timeout = 30
+
     def log_message(self, fmt, *args):
-        print(f"[{self.address_string()}] {fmt % args}")
+        logging.info("request %s %s", self.command,
+                     urllib.parse.urlsplit(self.path).path)
 
     def _json(self, data, status=200):
         body = json.dumps(data).encode()
@@ -213,55 +227,71 @@ class Handler(BaseHTTPRequestHandler):
             self._serve_static(path)
 
     def _handle_search(self, params):
-        q = params.get("q", "").strip()
+        q = _clean_param(params, "q")
         if not q:
             return self._error("missing q", 400)
         try:
             raw = get_client().artist_search(q, limit=30)
             self._json(_rank_search_results(q, raw, top=10))
+        # %s only; the __cause__ chain holds the unredacted upstream URL
         except LastFMError as e:
+            logging.warning("lastfm: %s", e)
             self._error(str(e))
 
     def _handle_artist(self, params):
-        name = params.get("name", "").strip()
+        name = _clean_param(params, "name")
         if not name:
             return self._error("missing name", 400)
         try:
             info = get_client().artist_info(name)
             self._json(info)
+        # %s only; the __cause__ chain holds the unredacted upstream URL
         except LastFMError as e:
+            logging.warning("lastfm: %s", e)
             self._error(str(e))
 
     def _handle_similar(self, params):
-        artist = params.get("artist", "").strip()
+        artist = _clean_param(params, "artist")
         if not artist:
             return self._error("missing artist", 400)
         try:
             limit = int(params.get("limit", 5))
+        except ValueError:
+            return self._error("invalid limit", 400)
+        limit = max(1, min(limit, 50))
+        try:
             results = get_client().similar_artists(artist, limit=limit)
             self._json(results)
+        # %s only; the __cause__ chain holds the unredacted upstream URL
         except LastFMError as e:
+            logging.warning("lastfm: %s", e)
             self._error(str(e))
 
     def _handle_chain(self, params):
-        a = params.get("from", "").strip()
-        b = params.get("to", "").strip()
+        a = _clean_param(params, "from")
+        b = _clean_param(params, "to")
         if not a or not b:
             return self._error("missing from or to", 400)
         cache_key = frozenset((a.lower(), b.lower()))
         if _no_chain_check(cache_key):
             return self._json({"error": "No path found — these artists may not be connected in Last.fm's similarity graph."})
+        if not _chain_slots.acquire(blocking=False):
+            return self._error("busy, try again shortly", 503)
         try:
             result = find_chain(get_client(), a, b)
             if result is None:
                 _no_chain_record(cache_key)
                 return self._json({"error": "No path found — these artists may not be connected in Last.fm's similarity graph."})
             self._json(result)
+        # %s only; the __cause__ chain holds the unredacted upstream URL
         except LastFMError as e:
+            logging.warning("lastfm: %s", e)
             self._error(str(e))
+        finally:
+            _chain_slots.release()
 
     def _handle_image(self, params):
-        name = params.get("name", "").strip()
+        name = _clean_param(params, "name")
         if not name:
             return self._error("missing name", 400)
 
@@ -287,6 +317,9 @@ class Handler(BaseHTTPRequestHandler):
             with _image_cache_lock:
                 _image_cache[name] = url
                 _image_inflight.pop(name, None)
+                while len(_image_cache) > _IMAGE_CACHE_MAX:
+                    oldest = next(iter(_image_cache))
+                    _image_cache.pop(oldest, None)
             fut.set_result(url)
         else:
             url = fut.result()
