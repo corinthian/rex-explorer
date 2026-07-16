@@ -1,10 +1,6 @@
-__pycache__/
-*.pyc
-*.pyo
-.git
-.gitignore
-*.md
-DESIGN.json
-.DS_Store
-.venv
-venv
+*
+!requirements.txt
+!lastfm.py
+!pathfind.py
+!server.py
+!static/
