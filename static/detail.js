@@ -126,7 +126,7 @@ export async function showDetail(name) {
   detailTags.innerHTML = (info.tags || []).slice(0, 6)
     .map(t => `<span class="tag">${escHtml(t)}</span>`).join("");
   detailBio.textContent = info.bio_summary || "";
-  detailLink.href = info.url || "#";
+  detailLink.href = (info.url || "").startsWith("https://") ? info.url : "#";
 }
 
 // Floating tooltip for buttons inside overflow:hidden containers (where

@@ -29,16 +29,16 @@ def find_chain(lastfm: LastFM, from_name: str, to_name: str,
     total = sum(delta.values())
     if result is not None:
         logger.info(
-            "chain %s\u2192%s: %d calls (%d cache, %d dedup, %d net) "
+            "chain: %d calls (%d cache, %d dedup, %d net) "
             "elapsed=%.1fs hops=%d score=%.4f",
-            from_name, to_name, total,
+            total,
             delta["cache_hit"], delta["dedup_hit"], delta["network"],
             elapsed, result["hops"], result["total_score"],
         )
     else:
         logger.info(
-            "chain %s\u2192%s: no path; %d calls (%d cache, %d dedup, %d net) elapsed=%.1fs",
-            from_name, to_name, total,
+            "chain: no path; %d calls (%d cache, %d dedup, %d net) elapsed=%.1fs",
+            total,
             delta["cache_hit"], delta["dedup_hit"], delta["network"],
             elapsed,
         )

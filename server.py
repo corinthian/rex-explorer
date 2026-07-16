@@ -192,7 +192,8 @@ class Handler(BaseHTTPRequestHandler):
     timeout = 30
 
     def log_message(self, fmt, *args):
-        print(f"[{self.address_string()}] {fmt % args}")
+        logging.info("request %s %s", self.command,
+                     urllib.parse.urlsplit(self.path).path)
 
     def _json(self, data, status=200):
         body = json.dumps(data).encode()
