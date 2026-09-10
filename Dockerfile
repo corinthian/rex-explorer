@@ -1,5 +1,5 @@
 # python:3.11-slim
-FROM python@sha256:baf89808ec37adeaab83cec287adb4a2afa4a11c1d51e961c7ec737877e61af6
+FROM python@sha256:e06cc1111ed84189e91866447f562b89faadbfbbb9937cd67e6bf4172cdb45df
 
 WORKDIR /app
 
