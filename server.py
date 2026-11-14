@@ -12,6 +12,7 @@ import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
+from email.utils import formatdate, parsedate_to_datetime
 from concurrent.futures import Future
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -67,6 +68,32 @@ _NO_CHAIN_MAX = 1000   # cap entries; oldest evicted when exceeded
 _chain_slots = threading.BoundedSemaphore(2)  # cap concurrent /api/chain runs
 
 MAX_PARAM_LENGTH = 200
+
+_APP_SUFFIXES = (".js", ".css", ".svg", ".html")
+_VENDOR_CACHE_CONTROL = "public, max-age=2592000"  # 30 days
+
+
+def _static_cache_control(path: str) -> str | None:
+    if path.startswith("/vendor/"):
+        return _VENDOR_CACHE_CONTROL
+    if path.endswith(_APP_SUFFIXES):
+        return "no-cache"
+    return None
+
+
+def _not_modified(headers, etag: str, mtime: int) -> bool:
+    """If-None-Match wins over If-Modified-Since when both are sent."""
+    inm = headers.get("If-None-Match")
+    if inm is not None:
+        tags = [t.strip() for t in inm.split(",")]
+        return "*" in tags or any(t.removeprefix("W/") == etag for t in tags)
+    ims = headers.get("If-Modified-Since")
+    if ims:
+        try:
+            return mtime <= parsedate_to_datetime(ims).timestamp()
+        except (TypeError, ValueError, OverflowError):
+            return False
+    return False
 
 
 def _clean_param(params, key):
@@ -401,13 +428,25 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if not file_path.is_relative_to(static_root) or not file_path.is_file():
                 raise FileNotFoundError(path)
+            stat = file_path.stat()
             body = file_path.read_bytes()
         except OSError:
             self.send_response(404)
             self.end_headers()
             return
+        etag = f'"{stat.st_mtime_ns:x}-{stat.st_size:x}"'
+        mtime = int(stat.st_mtime)
+        cache_control = _static_cache_control(path)
+        not_modified = _not_modified(self.headers, etag, mtime)
+        self.send_response(304 if not_modified else 200)
+        self.send_header("ETag", etag)
+        self.send_header("Last-Modified", formatdate(mtime, usegmt=True))
+        if cache_control:
+            self.send_header("Cache-Control", cache_control)
+        if not_modified:
+            self.end_headers()
+            return
         mime, _ = mimetypes.guess_type(str(file_path))
-        self.send_response(200)
         self.send_header("Content-Type", mime or "application/octet-stream")
         self.send_header("Content-Length", len(body))
         self.end_headers()
