@@ -45,7 +45,8 @@ def running_server(client=None, fetch_image=None):
     """Serve server.Handler on an ephemeral loopback port; yields the port."""
     get_client = (lambda: client) if client is not None else _no_network
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
-    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread = threading.Thread(target=httpd.serve_forever,
+                              kwargs={"poll_interval": 0.02}, daemon=True)
     with patch.object(server, "get_client", get_client), \
             patch.object(server, "_fetch_image_url", fetch_image or _no_network):
         thread.start()

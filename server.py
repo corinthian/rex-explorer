@@ -8,6 +8,7 @@ import os
 import sys
 import threading
 import time
+import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -207,6 +208,25 @@ class Handler(BaseHTTPRequestHandler):
         self._json({"error": msg}, status)
 
     def do_GET(self):
+        try:
+            self._route()
+        except ConnectionError:
+            self.close_connection = True
+        except Exception as e:
+            # Type and location only: the message and the __cause__ chain can
+            # hold the query string or the unredacted upstream URL
+            frame = traceback.extract_tb(e.__traceback__)[-1]
+            logging.error("unhandled %s at %s:%s in %s %s", type(e).__name__,
+                          Path(frame.filename).name, frame.lineno, self.command,
+                          urllib.parse.urlsplit(self.path).path)
+            self.close_connection = True
+            try:
+                self._headers_buffer = []
+                self._error("internal error", 500)
+            except Exception:
+                pass
+
+    def _route(self):
         parsed = urllib.parse.urlparse(self.path)
         params = dict(urllib.parse.parse_qsl(parsed.query))
         path = parsed.path
@@ -378,12 +398,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
             return
-        if not file_path.is_relative_to(static_root) or not file_path.is_file():
+        try:
+            if not file_path.is_relative_to(static_root) or not file_path.is_file():
+                raise FileNotFoundError(path)
+            body = file_path.read_bytes()
+        except OSError:
             self.send_response(404)
             self.end_headers()
             return
         mime, _ = mimetypes.guess_type(str(file_path))
-        body = file_path.read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", mime or "application/octet-stream")
         self.send_header("Content-Length", len(body))
