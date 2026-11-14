@@ -16,6 +16,7 @@ from requests.adapters import HTTPAdapter
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
+BIO_LINK_TEXT = "Read more on Last.fm"  # all that is left of a link-only bio
 
 BASE_URL = "https://ws.audioscrobbler.com/2.0/"
 CACHE_TTL = 7 * 24 * 3600  # 7 days
@@ -224,6 +225,8 @@ class LastFM:
         bio = _HTML_TAG_RE.sub("", bio)
         bio = html.unescape(bio)
         bio = _WS_RE.sub(" ", bio).strip()
+        if bio == BIO_LINK_TEXT:
+            bio = ""
         return {
             "name": info.get("name", artist),
             "listeners": int(info.get("stats", {}).get("listeners", 0)),
