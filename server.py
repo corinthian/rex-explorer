@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lastfm import LastFM, LastFMError
-from pathfind import find_chain
+from pathfind import CHAIN_DEADLINE, ChainTimeout, find_chain
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -278,11 +278,14 @@ class Handler(BaseHTTPRequestHandler):
         if not _chain_slots.acquire(blocking=False):
             return self._error("busy, try again shortly", 503)
         try:
-            result = find_chain(get_client(), a, b)
+            result = find_chain(get_client(), a, b, deadline=CHAIN_DEADLINE)
             if result is None:
                 _no_chain_record(cache_key)
                 return self._json({"error": "No path found — these artists may not be connected in Last.fm's similarity graph."})
             self._json(result)
+        except ChainTimeout:
+            self._error("That search took too long. "
+                        "Try a closer pair of artists.", 504)
         # %s only; the __cause__ chain holds the unredacted upstream URL
         except LastFMError as e:
             logging.warning("lastfm: %s", e)
