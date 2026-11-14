@@ -98,11 +98,50 @@ def _not_modified(headers, etag: str, mtime: int) -> bool:
     return False
 
 
+NO_PATH_MSG = ("No path found. These artists may not be connected "
+               "in Last.fm's similarity graph.")
+_PRUNE_INTERVAL = 86400  # 24 h
+
+
+class ParamTooLong(Exception):
+    pass
+
+
+def _is_control(c: str) -> bool:
+    """C0, DEL, C1 and bidi control characters."""
+    o = ord(c)
+    return (o < 0x20 or 0x7F <= o <= 0x9F or o in (0x200E, 0x200F)
+            or 0x202A <= o <= 0x202E or 0x2066 <= o <= 0x2069)
+
+
 def _clean_param(params, key):
     value = params.get(key, "").strip()
-    if not value or len(value) > MAX_PARAM_LENGTH or any(ord(c) < 32 for c in value):
+    if len(value) > MAX_PARAM_LENGTH:
+        raise ParamTooLong(key)
+    if not value or any(_is_control(c) for c in value):
         return None
     return value
+
+
+def _prune_loop(client, interval, stop):
+    while True:
+        try:
+            removed = client.prune_cache()
+            if removed:
+                logging.info("cache prune: removed %d expired files", removed)
+        except Exception as e:
+            logging.warning("cache prune failed: %s", type(e).__name__)
+        if stop.wait(interval):
+            return
+
+
+def start_cache_pruner(client, interval=_PRUNE_INTERVAL, stop=None):
+    """Delete expired cache files now and every `interval` seconds."""
+    thread = threading.Thread(
+        target=_prune_loop, args=(client, interval, stop or threading.Event()),
+        name="cache-prune", daemon=True)
+    thread.start()
+    return thread
 
 
 def _no_chain_record(key: frozenset) -> None:
@@ -263,6 +302,8 @@ class Handler(BaseHTTPRequestHandler):
     def _guarded(self, handle):
         try:
             handle()
+        except ParamTooLong as e:
+            self._error(f"{e.args[0]} too long", 400)
         except ConnectionError:
             self.close_connection = True
         except Exception as e:
@@ -347,14 +388,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._error("missing from or to", 400)
         cache_key = frozenset((a.lower(), b.lower()))
         if _no_chain_check(cache_key):
-            return self._json({"error": "No path found — these artists may not be connected in Last.fm's similarity graph."})
+            return self._error(NO_PATH_MSG, 404)
         if not _chain_slots.acquire(blocking=False):
             return self._error("busy, try again shortly", 503)
         try:
             result = find_chain(get_client(), a, b, deadline=CHAIN_DEADLINE)
             if result is None:
                 _no_chain_record(cache_key)
-                return self._json({"error": "No path found — these artists may not be connected in Last.fm's similarity graph."})
+                return self._error(NO_PATH_MSG, 404)
             self._json(result)
         except ChainTimeout:
             self._error("That search took too long. "
@@ -451,22 +492,20 @@ class Handler(BaseHTTPRequestHandler):
     def _serve_static(self, path):
         if path == "/" or path == "":
             path = "/index.html"
+        if path.endswith("/"):
+            return self._error("not found", 404)
         static_root = STATIC_DIR.resolve()
         try:
             file_path = (STATIC_DIR / path.lstrip("/")).resolve()
         except (OSError, RuntimeError):
-            self.send_response(404)
-            self.end_headers()
-            return
+            return self._error("not found", 404)
         try:
             if not file_path.is_relative_to(static_root) or not file_path.is_file():
                 raise FileNotFoundError(path)
             stat = file_path.stat()
             body = file_path.read_bytes()
         except OSError:
-            self.send_response(404)
-            self.end_headers()
-            return
+            return self._error("not found", 404)
         etag = f'"{stat.st_mtime_ns:x}-{stat.st_size:x}"'
         mtime = int(stat.st_mtime)
         cache_control = _static_cache_control(path)
@@ -493,5 +532,6 @@ if __name__ == "__main__":
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
 
+    start_cache_pruner(get_client())
     print(f"Rex Explorer running at http://localhost:{PORT}")
     ThreadingHTTPServer(("", PORT), Handler).serve_forever()

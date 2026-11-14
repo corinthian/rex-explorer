@@ -86,6 +86,28 @@ class LastFM:
         tmp.write_text(json.dumps({"fetched": time.time(), "data": data}))
         os.replace(tmp, path)
 
+    def prune_cache(self) -> int:
+        """Delete expired cache files; returns how many. Never raises.
+        A file that does not parse (a stale .tmp) goes by mtime and CACHE_TTL."""
+        removed = 0
+        try:
+            now = time.time()
+            for path in self.cache_dir.glob("*/*.json*"):
+                try:
+                    try:
+                        entry = json.loads(path.read_text())
+                        age, ttl = now - entry["fetched"], _entry_ttl(entry)
+                    except (ValueError, KeyError, TypeError):
+                        age, ttl = now - path.stat().st_mtime, CACHE_TTL
+                    if age >= ttl:
+                        path.unlink()
+                        removed += 1
+                except Exception:
+                    continue
+        except Exception:
+            logger.warning("cache prune failed")
+        return removed
+
     # --------------------------------------------------------------- http
 
     def _request(self, method: str, params: dict) -> dict:
