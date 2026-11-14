@@ -2,7 +2,7 @@
 // Holds the version counters used to discard stale fetches when the user
 // re-roots or chains again before an in-flight request returns.
 
-import { hashColor, initials, linkKey } from "./utils.js";
+import { hashColor, initials, linkKey, fetchJSON } from "./utils.js";
 import {
   nodes, links, chainLinkKeys, detailCache,
   getRoot, setRoot, startLoading, stopLoading,
@@ -81,13 +81,12 @@ export async function addChainTo(targetName) {
   startLoading();
   connectError.hidden = true;
   try {
-    const res = await fetch(
+    const { ok, data, error } = await fetchJSON(
       `/api/chain?from=${encodeURIComponent(myRoot)}&to=${encodeURIComponent(targetName)}`
     );
-    const data = await res.json();
     if (myVersion !== addChainVersion || getRoot() !== myRoot) return;
-    if (!res.ok || data.error) {
-      connectError.textContent = data.error || "no chain found";
+    if (!ok || !data || !Array.isArray(data.path)) {
+      connectError.textContent = error || "Request failed.";
       connectError.hidden = false;
       connectInput.value = "";
       connectClear.classList.remove("visible");
@@ -154,25 +153,36 @@ export async function addRootArtist(name) {
   startLoading();
   try {
     const [infoRes, simRes] = await Promise.all([
-      fetch(`/api/artist?name=${encodeURIComponent(name)}`),
-      fetch(`/api/similar?artist=${encodeURIComponent(name)}&limit=5`),
+      fetchJSON(`/api/artist?name=${encodeURIComponent(name)}`),
+      fetchJSON(`/api/similar?artist=${encodeURIComponent(name)}&limit=5`),
     ]);
-    const [info, similar] = await Promise.all([infoRes.json(), simRes.json()]);
     if (myVersion !== addRootVersion) return;
+
+    if (!infoRes.ok || !infoRes.data) {
+      searchError.textContent = infoRes.error || "Request failed.";
+      searchError.hidden = false;
+      return;
+    }
+    const info = infoRes.data;
+    const similar = simRes.data;
+    const simOk = simRes.ok && Array.isArray(similar);
 
     const canonName = info.name || name;
     const color = hashColor(canonName);
     const rootNode = addNode(canonName, color, initials(canonName), info.tags || []);
-    rootNode.expanded = true;
 
-    if (Array.isArray(similar)) {
+    if (simOk) {
+      rootNode.expanded = true;
       for (const s of similar) {
         addNode(s.name, hashColor(s.name), initials(s.name));
         addLink(canonName, s.name, s.match);
       }
+    } else {
+      searchError.textContent = simRes.error || "Request failed.";
+      searchError.hidden = false;
     }
 
-    if (!info.error) detailCache.set(canonName, info);
+    detailCache.set(canonName, info);
     showDetail(canonName);
     setRoot(canonName);
     connectInput.placeholder = `Find connection from ${canonName}…`;

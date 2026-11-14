@@ -2,7 +2,7 @@
 // (also used by the landing-popup help). Owns the image-poll lifecycle and
 // the floating tooltip used inside overflow:hidden containers.
 
-import { escHtml, fmtListeners } from "./utils.js";
+import { escHtml, fmtListeners, fetchJSON } from "./utils.js";
 import { nodes, detailCache, imageCache } from "./state.js";
 import { Graph } from "./graph.js";
 
@@ -109,16 +109,15 @@ export async function showDetail(name) {
 
   let info = detailCache.get(name);
   if (!info) {
-    try {
-      const res = await fetch(`/api/artist?name=${encodeURIComponent(name)}`);
-      info = await res.json();
-      if (detailPanel.hidden || detailName.textContent !== name) return;
-      if (!info.error) detailCache.set(name, info);
-    } catch (e) {
+    const res = await fetchJSON(`/api/artist?name=${encodeURIComponent(name)}`);
+    if (detailPanel.hidden || detailName.textContent !== name) return;
+    if (!res.ok || !res.data) {
+      detailBio.textContent = "Could not load artist details.";
       return;
     }
+    info = res.data;
+    detailCache.set(name, info);
   }
-  if (info.error) return;
   if (detailPanel.hidden || detailName.textContent !== name) return;
 
   detailName.textContent = info.name || name;
