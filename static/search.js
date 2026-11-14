@@ -1,7 +1,7 @@
 // Search and connect inputs: input handling, debounced /api/search calls,
 // ARIA combobox dropdown rendering, and the landing → graph-active flow.
 
-import { escHtml, fmtListeners } from "./utils.js";
+import { escHtml, fmtListeners, fetchJSON } from "./utils.js";
 import { addRootArtist, addChainTo } from "./chain.js";
 import { BgGraph } from "./bg-graph.js";
 
@@ -129,13 +129,12 @@ document.addEventListener("click", e => {
 async function doSearch(q) {
   const myVersion = ++searchVersion;
   try {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-    const data = await res.json();
+    const { ok, data, error } = await fetchJSON(`/api/search?q=${encodeURIComponent(q)}`);
     if (myVersion !== searchVersion) return;
     if (searchInput.value.trim() !== q) return;
-    if (!res.ok || (data && data.error)) {
+    if (!ok) {
       hideResults(searchResults);
-      searchError.textContent = (data && data.error) || "Search failed";
+      searchError.textContent = error;
       searchError.hidden = false;
       return;
     }
@@ -180,13 +179,12 @@ connectInput.addEventListener("input", () => {
   connectTimer = setTimeout(async () => {
     const myVersion = ++connectVersion;
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
+      const { ok, data, error } = await fetchJSON(`/api/search?q=${encodeURIComponent(q)}`);
       if (myVersion !== connectVersion) return;
       if (connectInput.value.trim() !== q) return;
-      if (!res.ok || (data && data.error)) {
+      if (!ok) {
         hideResults(connectResults);
-        connectError.textContent = (data && data.error) || "Search failed";
+        connectError.textContent = error;
         connectError.hidden = false;
         return;
       }

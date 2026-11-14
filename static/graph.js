@@ -3,7 +3,7 @@
 // Click handling is wired by app.js so this module does not need to know
 // about the detail panel.
 
-import { hashColor, initials, linkKey } from "./utils.js";
+import { hashColor, initials, linkKey, fetchJSON } from "./utils.js";
 import {
   nodes, links, linkKeys, chainLinkKeys, detailCache, imageCache,
   getImage, loadImage, getRoot, reducedMotion,
@@ -11,6 +11,7 @@ import {
 } from "./state.js";
 
 const graphEl = document.getElementById("graph");
+const searchError = document.getElementById("search-error");
 
 // ------------------------------------------------------------ per-node loading
 
@@ -246,27 +247,32 @@ export function reheat() {
 export async function expandNode(node) {
   if (node.expanded) return;
   node.expanded = true;
+  searchError.hidden = true;
   node.abortController = new AbortController();
   beginNodeLoading(node);
   startLoading();
 
   try {
-    const res = await fetch(
+    const { ok, data: similar, error } = await fetchJSON(
       `/api/similar?artist=${encodeURIComponent(node.name)}&limit=5`,
       { signal: node.abortController.signal }
     );
-    const similar = await res.json();
     if (!node.expanded) return;
-    if (res.ok && Array.isArray(similar)) {
+    if (ok && Array.isArray(similar)) {
       for (const s of similar) {
         addNode(s.name, hashColor(s.name), initials(s.name));
         addLink(node.name, s.name, s.match);
       }
       refreshGraph();
       reheat();
+    } else {
+      node.expanded = false;
+      searchError.textContent = error || "Request failed.";
+      searchError.hidden = false;
     }
   } catch (e) {
     if (e.name === 'AbortError') return;
+    node.expanded = false;
     console.error("expand failed:", e);
   } finally {
     endNodeLoading(node);

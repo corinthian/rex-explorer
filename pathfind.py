@@ -7,22 +7,37 @@ from concurrent.futures import ThreadPoolExecutor
 from lastfm import LastFM
 
 WORKERS = 3
+CHAIN_DEADLINE = 40.0  # seconds of wall clock per find_chain call
 
 logger = logging.getLogger(__name__)
 
 
+class ChainTimeout(Exception):
+    pass
+
+
 def find_chain(lastfm: LastFM, from_name: str, to_name: str,
-               branch: int = 50, budgets: tuple = (60, 200)) -> dict | None:
+               branch: int = 50, budgets: tuple = (60, 120),
+               deadline: float = CHAIN_DEADLINE) -> dict | None:
     """Find the strongest chain of similar artists between two artists.
     Returns {from, to, hops, path, total_score} or None.
-    Tries each budget in sequence, returning on first success."""
+    Tries each budget in sequence, returning on first success.
+    Raises ChainTimeout once `deadline` seconds of wall clock have passed."""
     start = time.monotonic()
+    deadline_at = start + deadline
     stats_before = dict(lastfm.stats)
     result = None
-    for budget in budgets:
-        result = _find_chain_once(lastfm, from_name, to_name, branch, budget)
-        if result is not None:
-            break
+    try:
+        for budget in budgets:
+            if time.monotonic() >= deadline_at:
+                raise ChainTimeout()
+            result = _find_chain_once(lastfm, from_name, to_name, branch,
+                                      budget, deadline_at)
+            if result is not None:
+                break
+    except ChainTimeout:
+        logger.info("chain: timeout elapsed=%.1fs", time.monotonic() - start)
+        raise
     elapsed = time.monotonic() - start
     s = lastfm.stats
     delta = {k: s[k] - stats_before[k] for k in s}
@@ -46,11 +61,13 @@ def find_chain(lastfm: LastFM, from_name: str, to_name: str,
 
 
 def _find_chain_once(lastfm: LastFM, from_name: str, to_name: str,
-                     branch: int = 50, budget_per_side: int = 60) -> dict | None:
+                     branch: int = 50, budget_per_side: int = 60,
+                     deadline_at: float | None = None) -> dict | None:
     """
     Single-pass bidirectional Dijkstra over the Last.fm similarity graph.
     Both endpoints expand simultaneously via ThreadPoolExecutor (WORKERS=3).
     Stops when the bidirectional termination condition holds or budgets exhaust.
+    Raises ChainTimeout when time.monotonic() passes deadline_at.
     """
     def lc(s):
         return s.lower()
@@ -129,6 +146,9 @@ def _find_chain_once(lastfm: LastFM, from_name: str, to_name: str,
 
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         while fwd_budget[0] < budget_per_side or bwd_budget[0] < budget_per_side:
+            if deadline_at is not None and time.monotonic() >= deadline_at:
+                raise ChainTimeout()
+
             ft = top(fwd_heap)
             bt = top(bwd_heap)
 

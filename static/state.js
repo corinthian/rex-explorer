@@ -3,6 +3,8 @@
 // other modules being loaded; everything in here is consumed by graph.js,
 // detail.js, chain.js, and search.js.
 
+import { fetchJSON } from "./utils.js";
+
 export const nodes = new Map();        // name -> node object
 export const links = [];               // {source, target, match, chain?}
 export const linkKeys = new Set();     // canonical "a|||b" keys mirroring `links`
@@ -27,10 +29,9 @@ export function getImage(name) {
 export function loadImage(name) {
   if (imageCache.has(name)) return;
   imageCache.set(name, 'loading');
-  fetch(`/api/image?name=${encodeURIComponent(name)}`)
-    .then(r => r.json())
-    .then(data => {
-      if (!data.url) { imageCache.set(name, null); return; }
+  fetchJSON(`/api/image?name=${encodeURIComponent(name)}`)
+    .then(({ ok, data }) => {
+      if (!ok || !data || !data.url) { imageCache.set(name, null); return; }
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {

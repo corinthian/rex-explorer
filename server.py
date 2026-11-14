@@ -8,16 +8,18 @@ import os
 import sys
 import threading
 import time
+import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
-from concurrent.futures import Future
+from email.utils import formatdate, parsedate_to_datetime
+from concurrent.futures import Future, TimeoutError as FutureTimeout
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from lastfm import LastFM, LastFMError
-from pathfind import find_chain
+from pathfind import CHAIN_DEADLINE, ChainTimeout, find_chain
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -55,10 +57,12 @@ def _load_api_key() -> str:
 
 
 _client: LastFM | None = None
-_image_cache: dict = {}  # artist name -> image URL or None
+_image_cache: dict = {}  # artist name -> (image URL or None, time stored)
 _image_cache_lock = threading.Lock()
 _image_inflight: dict = {}  # artist name -> Future[str | None]
 _IMAGE_CACHE_MAX = 5000  # cap entries; oldest evicted when exceeded
+_IMAGE_NONE_TTL = 3600  # a miss is retried after 1 h; a found URL never expires
+_IMAGE_WAIT_TIMEOUT = 35  # non-owner wait on an in-flight lookup, under nginx's 60 s
 _no_chain_cache: dict = {}  # frozenset({a_lc, b_lc}) -> timestamp
 _no_chain_cache_lock = threading.Lock()
 _NO_CHAIN_TTL = 86400  # 24 h
@@ -67,12 +71,77 @@ _chain_slots = threading.BoundedSemaphore(2)  # cap concurrent /api/chain runs
 
 MAX_PARAM_LENGTH = 200
 
+_APP_SUFFIXES = (".js", ".css", ".svg", ".html")
+_VENDOR_CACHE_CONTROL = "public, max-age=2592000"  # 30 days
+
+
+def _static_cache_control(path: str) -> str | None:
+    if path.startswith("/vendor/"):
+        return _VENDOR_CACHE_CONTROL
+    if path.endswith(_APP_SUFFIXES):
+        return "no-cache"
+    return None
+
+
+def _not_modified(headers, etag: str, mtime: int) -> bool:
+    """If-None-Match wins over If-Modified-Since when both are sent."""
+    inm = headers.get("If-None-Match")
+    if inm is not None:
+        tags = [t.strip() for t in inm.split(",")]
+        return "*" in tags or any(t.removeprefix("W/") == etag for t in tags)
+    ims = headers.get("If-Modified-Since")
+    if ims:
+        try:
+            return mtime <= parsedate_to_datetime(ims).timestamp()
+        except (TypeError, ValueError, OverflowError):
+            return False
+    return False
+
+
+NO_PATH_MSG = ("No path found. These artists may not be connected "
+               "in Last.fm's similarity graph.")
+_PRUNE_INTERVAL = 86400  # 24 h
+
+
+class ParamTooLong(Exception):
+    pass
+
+
+def _is_control(c: str) -> bool:
+    """C0, DEL, C1 and bidi control characters."""
+    o = ord(c)
+    return (o < 0x20 or 0x7F <= o <= 0x9F or o in (0x200E, 0x200F)
+            or 0x202A <= o <= 0x202E or 0x2066 <= o <= 0x2069)
+
 
 def _clean_param(params, key):
     value = params.get(key, "").strip()
-    if not value or len(value) > MAX_PARAM_LENGTH or any(ord(c) < 32 for c in value):
+    if len(value) > MAX_PARAM_LENGTH:
+        raise ParamTooLong(key)
+    if not value or any(_is_control(c) for c in value):
         return None
     return value
+
+
+def _prune_loop(client, interval, stop):
+    while True:
+        try:
+            removed = client.prune_cache()
+            if removed:
+                logging.info("cache prune: removed %d expired files", removed)
+        except Exception as e:
+            logging.warning("cache prune failed: %s", type(e).__name__)
+        if stop.wait(interval):
+            return
+
+
+def start_cache_pruner(client, interval=_PRUNE_INTERVAL, stop=None):
+    """Delete expired cache files now and every `interval` seconds."""
+    thread = threading.Thread(
+        target=_prune_loop, args=(client, interval, stop or threading.Event()),
+        name="cache-prune", daemon=True)
+    thread.start()
+    return thread
 
 
 def _no_chain_record(key: frozenset) -> None:
@@ -192,21 +261,67 @@ class Handler(BaseHTTPRequestHandler):
     timeout = 30
 
     def log_message(self, fmt, *args):
-        logging.info("request %s %s", self.command,
-                     urllib.parse.urlsplit(self.path).path)
+        # Path only, never the query string. command and path are unset
+        # when the request line itself failed to parse.
+        logging.info("request %s %s", getattr(self, "command", None) or "-",
+                     urllib.parse.urlsplit(getattr(self, "path", "")).path)
 
-    def _json(self, data, status=200):
+    def log_error(self, fmt, *args):
+        # send_error logs here and again through log_request; keep the latter
+        pass
+
+    def _send_body(self, body):
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _json(self, data, status=200, headers=None):
         body = json.dumps(data).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", len(body))
+        for key, value in (headers or {}).items():
+            self.send_header(key, value)
         self.end_headers()
-        self.wfile.write(body)
+        self._send_body(body)
 
     def _error(self, msg, status=500):
         self._json({"error": msg}, status)
 
     def do_GET(self):
+        self._guarded(self._route)
+
+    def do_HEAD(self):
+        self._guarded(self._route)
+
+    def _method_not_allowed(self):
+        self._guarded(lambda: self._json({"error": "method not allowed"}, 405,
+                                         {"Allow": "GET, HEAD"}))
+
+    do_POST = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = _method_not_allowed
+
+    def _guarded(self, handle):
+        try:
+            try:
+                handle()
+            except ParamTooLong as e:
+                self._error(f"{e.args[0]} too long", 400)
+        except ConnectionError:
+            self.close_connection = True
+        except Exception as e:
+            # Type and location only: the message and the __cause__ chain can
+            # hold the query string or the unredacted upstream URL
+            frame = traceback.extract_tb(e.__traceback__)[-1]
+            logging.error("unhandled %s at %s:%s in %s %s", type(e).__name__,
+                          Path(frame.filename).name, frame.lineno, self.command,
+                          urllib.parse.urlsplit(self.path).path)
+            self.close_connection = True
+            try:
+                self._headers_buffer = []
+                self._error("internal error", 500)
+            except Exception:
+                pass
+
+    def _route(self):
         parsed = urllib.parse.urlparse(self.path)
         params = dict(urllib.parse.parse_qsl(parsed.query))
         path = parsed.path
@@ -274,15 +389,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._error("missing from or to", 400)
         cache_key = frozenset((a.lower(), b.lower()))
         if _no_chain_check(cache_key):
-            return self._json({"error": "No path found — these artists may not be connected in Last.fm's similarity graph."})
+            return self._error(NO_PATH_MSG, 404)
         if not _chain_slots.acquire(blocking=False):
             return self._error("busy, try again shortly", 503)
         try:
-            result = find_chain(get_client(), a, b)
+            result = find_chain(get_client(), a, b, deadline=CHAIN_DEADLINE)
             if result is None:
                 _no_chain_record(cache_key)
-                return self._json({"error": "No path found — these artists may not be connected in Last.fm's similarity graph."})
+                return self._error(NO_PATH_MSG, 404)
             self._json(result)
+        except ChainTimeout:
+            self._error("That search took too long. "
+                        "Try a closer pair of artists.", 504)
         # %s only; the __cause__ chain holds the unredacted upstream URL
         except LastFMError as e:
             logging.warning("lastfm: %s", e)
@@ -296,8 +414,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._error("missing name", 400)
 
         with _image_cache_lock:
-            if name in _image_cache:
-                return self._json({"url": _image_cache[name]})
+            entry = _image_cache.get(name)
+            if entry is not None:
+                url, stored = entry
+                if url is not None or time.monotonic() - stored < _IMAGE_NONE_TTL:
+                    return self._json({"url": url})
+                _image_cache.pop(name, None)
             fut = _image_inflight.get(name)
             if fut is None:
                 fut = Future()
@@ -315,14 +437,17 @@ class Handler(BaseHTTPRequestHandler):
                 fut.set_exception(e)
                 raise
             with _image_cache_lock:
-                _image_cache[name] = url
+                _image_cache[name] = (url, time.monotonic())
                 _image_inflight.pop(name, None)
                 while len(_image_cache) > _IMAGE_CACHE_MAX:
                     oldest = next(iter(_image_cache))
                     _image_cache.pop(oldest, None)
             fut.set_result(url)
         else:
-            url = fut.result()
+            try:
+                url = fut.result(timeout=_IMAGE_WAIT_TIMEOUT)
+            except FutureTimeout:
+                url = None
         self._json({"url": url})
 
     def _serve_favicon(self):
@@ -363,29 +488,42 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", len(ICO))
         self.send_header("Cache-Control", "max-age=86400")
         self.end_headers()
-        self.wfile.write(ICO)
+        self._send_body(ICO)
 
     def _serve_static(self, path):
         if path == "/" or path == "":
             path = "/index.html"
+        if path.endswith("/"):
+            return self._error("not found", 404)
         static_root = STATIC_DIR.resolve()
         try:
             file_path = (STATIC_DIR / path.lstrip("/")).resolve()
         except (OSError, RuntimeError):
-            self.send_response(404)
-            self.end_headers()
-            return
-        if not file_path.is_relative_to(static_root) or not file_path.is_file():
-            self.send_response(404)
+            return self._error("not found", 404)
+        try:
+            if not file_path.is_relative_to(static_root) or not file_path.is_file():
+                raise FileNotFoundError(path)
+            stat = file_path.stat()
+            body = file_path.read_bytes()
+        except OSError:
+            return self._error("not found", 404)
+        etag = f'"{stat.st_mtime_ns:x}-{stat.st_size:x}"'
+        mtime = int(stat.st_mtime)
+        cache_control = _static_cache_control(path)
+        not_modified = _not_modified(self.headers, etag, mtime)
+        self.send_response(304 if not_modified else 200)
+        self.send_header("ETag", etag)
+        self.send_header("Last-Modified", formatdate(mtime, usegmt=True))
+        if cache_control:
+            self.send_header("Cache-Control", cache_control)
+        if not_modified:
             self.end_headers()
             return
         mime, _ = mimetypes.guess_type(str(file_path))
-        body = file_path.read_bytes()
-        self.send_response(200)
         self.send_header("Content-Type", mime or "application/octet-stream")
         self.send_header("Content-Length", len(body))
         self.end_headers()
-        self.wfile.write(body)
+        self._send_body(body)
 
 
 if __name__ == "__main__":
@@ -395,5 +533,6 @@ if __name__ == "__main__":
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
 
+    start_cache_pruner(get_client())
     print(f"Rex Explorer running at http://localhost:{PORT}")
     ThreadingHTTPServer(("", PORT), Handler).serve_forever()

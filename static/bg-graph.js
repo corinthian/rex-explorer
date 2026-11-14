@@ -1,6 +1,8 @@
 // Background graph rendered behind the landing screen as a slow vortex of
 // artists similar to a single root. Decorative; failures are swallowed.
 
+import { fetchJSON } from "./utils.js";
+
 const bgEl = document.getElementById("bg-graph");
 const bgNodes = new Map();
 const bgLinks = [];
@@ -52,7 +54,7 @@ export async function loadBgGraph() {
   try {
     bgNodes.set(ROOT, { id: ROOT, isRoot: true });
 
-    const rootSim = await fetch(`/api/similar?artist=${encodeURIComponent(ROOT)}&limit=5`).then(r => r.json());
+    const rootSim = await fetchJSON(`/api/similar?artist=${encodeURIComponent(ROOT)}&limit=5`).then(r => r.data);
     if (!Array.isArray(rootSim)) return;
 
     for (const s of rootSim) {
@@ -62,7 +64,7 @@ export async function loadBgGraph() {
 
     const childResults = await Promise.all(
       rootSim.map(s =>
-        fetch(`/api/similar?artist=${encodeURIComponent(s.name)}&limit=5`).then(r => r.json())
+        fetchJSON(`/api/similar?artist=${encodeURIComponent(s.name)}&limit=5`).then(r => r.data)
       )
     );
 

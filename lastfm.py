@@ -19,9 +19,15 @@ _WS_RE = re.compile(r"\s+")
 
 BASE_URL = "https://ws.audioscrobbler.com/2.0/"
 CACHE_TTL = 7 * 24 * 3600  # 7 days
+NOT_FOUND_TTL = 24 * 3600  # error 6 (not found), stored as empty data
+SIMILAR_FETCH_LIMIT = 50  # one upstream call serves every limit up to this
 MIN_REQUEST_INTERVAL = 0.2  # 200ms = ~5 req/sec; override via REX_LASTFM_INTERVAL_MS
 
 logger = logging.getLogger(__name__)
+
+
+def _entry_ttl(entry: dict) -> int:
+    return CACHE_TTL if entry["data"] else NOT_FOUND_TTL
 
 
 class LastFMError(Exception):
@@ -68,7 +74,7 @@ class LastFM:
             return None
         try:
             data = json.loads(path.read_text())
-            if time.time() - data["fetched"] < CACHE_TTL:
+            if time.time() - data["fetched"] < _entry_ttl(data):
                 return data["data"]
         except Exception:
             pass
@@ -80,12 +86,37 @@ class LastFM:
         tmp.write_text(json.dumps({"fetched": time.time(), "data": data}))
         os.replace(tmp, path)
 
+    def prune_cache(self) -> int:
+        """Delete expired cache files; returns how many. Never raises.
+        A file that does not parse (a stale .tmp) goes by mtime and CACHE_TTL."""
+        removed = 0
+        try:
+            now = time.time()
+            for path in self.cache_dir.glob("*/*.json*"):
+                try:
+                    try:
+                        entry = json.loads(path.read_text())
+                        age, ttl = now - entry["fetched"], _entry_ttl(entry)
+                    except (ValueError, KeyError, TypeError):
+                        age, ttl = now - path.stat().st_mtime, CACHE_TTL
+                    if age >= ttl:
+                        path.unlink()
+                        removed += 1
+                except Exception:
+                    continue
+        except Exception:
+            logger.warning("cache prune failed")
+        return removed
+
     # --------------------------------------------------------------- http
 
     def _request(self, method: str, params: dict) -> dict:
         params = {**params, "method": method, "api_key": self.api_key, "format": "json"}
         cache_key_params = {k: v for k, v in params.items()
                             if k not in ("api_key", "format")}
+        # Key only; the upstream request keeps the caller's spelling
+        if isinstance(cache_key_params.get("artist"), str):
+            cache_key_params["artist"] = cache_key_params["artist"].strip().lower()
         cache_path = self._cache_path(method, cache_key_params)
 
         cached = self._cache_get(cache_path)
@@ -131,15 +162,17 @@ class LastFM:
                 logger.warning("Last.fm returned non-JSON HTTP %s", resp.status_code)
                 raise LastFMError("Last.fm returned an invalid response")
 
+            not_found = False
             if "error" in data:
                 if data["error"] == 6:
                     data = {}
+                    not_found = True
                 else:
                     logger.warning("Last.fm upstream error %s: %s",
                                     data["error"], data.get("message", ""))
                     raise LastFMError(f"Last.fm error {data['error']}")
 
-            if data:
+            if data or not_found:
                 self._cache_put(cache_path, data)
             self._bump("network")
             fut.set_result(data)
@@ -156,12 +189,13 @@ class LastFM:
     def similar_artists(self, artist: str, limit: int = 100) -> list[dict]:
         """Returns list of {name, match} sorted by match desc."""
         data = self._request("artist.getSimilar", {
-            "artist": artist, "limit": limit, "autocorrect": 1
+            "artist": artist, "limit": max(limit, SIMILAR_FETCH_LIMIT),
+            "autocorrect": 1
         })
         artists = data.get("similarartists", {}).get("artist", [])
         # Last.fm occasionally returns "" for match on weak similars; treat as 0.
         return [{"name": a["name"], "match": float(a.get("match") or 0)}
-                for a in artists]
+                for a in artists[:limit]]
 
     def artist_search(self, query: str, limit: int = 10) -> list[dict]:
         """Returns list of {name, listeners} matching query."""
