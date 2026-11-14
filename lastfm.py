@@ -34,6 +34,10 @@ class LastFMError(Exception):
     pass
 
 
+class ArtistNotFound(LastFMError):
+    pass
+
+
 class LastFM:
     def __init__(self, api_key: str, cache_dir: Path = None):
         self.api_key = api_key
@@ -209,6 +213,9 @@ class LastFM:
     def artist_info(self, artist: str) -> dict:
         """Returns {name, tags, listeners, bio_summary, url} for an artist."""
         data = self._request("artist.getInfo", {"artist": artist, "autocorrect": 1})
+        # Error 6 comes back from _request, fresh or cached, as empty data
+        if not data:
+            raise ArtistNotFound("Artist not found on Last.fm.")
         info = data.get("artist", {})
         tags = [t["name"].lower() for t in info.get("tags", {}).get("tag", [])]
         bio = info.get("bio", {}).get("summary", "")

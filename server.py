@@ -18,7 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from lastfm import LastFM, LastFMError
+from lastfm import ArtistNotFound, LastFM, LastFMError
 from pathfind import CHAIN_DEADLINE, ChainTimeout, find_chain
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -360,6 +360,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             info = get_client().artist_info(name)
             self._json(info)
+        except ArtistNotFound as e:
+            self._error(str(e), 404)
         # %s only; the __cause__ chain holds the unredacted upstream URL
         except LastFMError as e:
             logging.warning("lastfm: %s", e)
