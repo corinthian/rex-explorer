@@ -70,6 +70,19 @@ class TestTopLevelHandler(unittest.TestCase):
                 pass
         handle_error.assert_not_called()
 
+    def test_too_long_param_with_broken_socket_does_not_raise_again(self):
+        def broken_json(self_, data, status=200, headers=None):
+            raise BrokenPipeError()
+
+        with patch.object(server.Handler, "_json", broken_json), \
+                patch("socketserver.BaseServer.handle_error") as handle_error, \
+                running_server() as port:
+            try:
+                request(port, "GET", "/api/search?q=" + "a" * 201)
+            except Exception:
+                pass
+        handle_error.assert_not_called()
+
     def test_failed_500_write_does_not_raise_again(self):
         def broken_json(self_, data, status=200):
             raise BrokenPipeError()

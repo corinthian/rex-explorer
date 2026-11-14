@@ -301,9 +301,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _guarded(self, handle):
         try:
-            handle()
-        except ParamTooLong as e:
-            self._error(f"{e.args[0]} too long", 400)
+            try:
+                handle()
+            except ParamTooLong as e:
+                self._error(f"{e.args[0]} too long", 400)
         except ConnectionError:
             self.close_connection = True
         except Exception as e:
