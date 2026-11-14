@@ -13,7 +13,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from email.utils import formatdate, parsedate_to_datetime
-from concurrent.futures import Future
+from concurrent.futures import Future, TimeoutError as FutureTimeout
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -57,10 +57,12 @@ def _load_api_key() -> str:
 
 
 _client: LastFM | None = None
-_image_cache: dict = {}  # artist name -> image URL or None
+_image_cache: dict = {}  # artist name -> (image URL or None, time stored)
 _image_cache_lock = threading.Lock()
 _image_inflight: dict = {}  # artist name -> Future[str | None]
 _IMAGE_CACHE_MAX = 5000  # cap entries; oldest evicted when exceeded
+_IMAGE_NONE_TTL = 3600  # a miss is retried after 1 h; a found URL never expires
+_IMAGE_WAIT_TIMEOUT = 35  # non-owner wait on an in-flight lookup, under nginx's 60 s
 _no_chain_cache: dict = {}  # frozenset({a_lc, b_lc}) -> timestamp
 _no_chain_cache_lock = threading.Lock()
 _NO_CHAIN_TTL = 86400  # 24 h
@@ -370,8 +372,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._error("missing name", 400)
 
         with _image_cache_lock:
-            if name in _image_cache:
-                return self._json({"url": _image_cache[name]})
+            entry = _image_cache.get(name)
+            if entry is not None:
+                url, stored = entry
+                if url is not None or time.monotonic() - stored < _IMAGE_NONE_TTL:
+                    return self._json({"url": url})
+                _image_cache.pop(name, None)
             fut = _image_inflight.get(name)
             if fut is None:
                 fut = Future()
@@ -389,14 +395,17 @@ class Handler(BaseHTTPRequestHandler):
                 fut.set_exception(e)
                 raise
             with _image_cache_lock:
-                _image_cache[name] = url
+                _image_cache[name] = (url, time.monotonic())
                 _image_inflight.pop(name, None)
                 while len(_image_cache) > _IMAGE_CACHE_MAX:
                     oldest = next(iter(_image_cache))
                     _image_cache.pop(oldest, None)
             fut.set_result(url)
         else:
-            url = fut.result()
+            try:
+                url = fut.result(timeout=_IMAGE_WAIT_TIMEOUT)
+            except FutureTimeout:
+                url = None
         self._json({"url": url})
 
     def _serve_favicon(self):
