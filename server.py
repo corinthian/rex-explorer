@@ -220,23 +220,47 @@ class Handler(BaseHTTPRequestHandler):
     timeout = 30
 
     def log_message(self, fmt, *args):
-        logging.info("request %s %s", self.command,
-                     urllib.parse.urlsplit(self.path).path)
+        # Path only, never the query string. command and path are unset
+        # when the request line itself failed to parse.
+        logging.info("request %s %s", getattr(self, "command", None) or "-",
+                     urllib.parse.urlsplit(getattr(self, "path", "")).path)
 
-    def _json(self, data, status=200):
+    def log_error(self, fmt, *args):
+        # send_error logs here and again through log_request; keep the latter
+        pass
+
+    def _send_body(self, body):
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _json(self, data, status=200, headers=None):
         body = json.dumps(data).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", len(body))
+        for key, value in (headers or {}).items():
+            self.send_header(key, value)
         self.end_headers()
-        self.wfile.write(body)
+        self._send_body(body)
 
     def _error(self, msg, status=500):
         self._json({"error": msg}, status)
 
     def do_GET(self):
+        self._guarded(self._route)
+
+    def do_HEAD(self):
+        self._guarded(self._route)
+
+    def _method_not_allowed(self):
+        self._guarded(lambda: self._json({"error": "method not allowed"}, 405,
+                                         {"Allow": "GET, HEAD"}))
+
+    do_POST = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = _method_not_allowed
+
+    def _guarded(self, handle):
         try:
-            self._route()
+            handle()
         except ConnectionError:
             self.close_connection = True
         except Exception as e:
@@ -413,7 +437,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", len(ICO))
         self.send_header("Cache-Control", "max-age=86400")
         self.end_headers()
-        self.wfile.write(ICO)
+        self._send_body(ICO)
 
     def _serve_static(self, path):
         if path == "/" or path == "":
@@ -450,7 +474,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", mime or "application/octet-stream")
         self.send_header("Content-Length", len(body))
         self.end_headers()
-        self.wfile.write(body)
+        self._send_body(body)
 
 
 if __name__ == "__main__":
